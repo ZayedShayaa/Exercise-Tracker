@@ -4,26 +4,29 @@ const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static('public'));
 
+// In-memory data storage
 const users = [];
 const exercises = [];
 
+// Home page
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
 
-// ✅ Create user
+// ✅ Create a new user
 app.post('/api/users', (req, res) => {
   const username = req.body.username;
-  const user = {
+  const newUser = {
     username,
     _id: uuidv4(),
   };
-  users.push(user);
-  res.json(user);
+  users.push(newUser);
+  res.json(newUser);
 });
 
 // ✅ Get all users
@@ -31,18 +34,18 @@ app.get('/api/users', (req, res) => {
   res.json(users);
 });
 
-// ✅ Add exercise
+// ✅ Add exercise to a user
 app.post('/api/users/:_id/exercises', (req, res) => {
   const user = users.find(u => u._id === req.params._id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const { description, duration, date } = req.body;
   if (!description || !duration) {
-    return res.status(400).json({ error: 'description and duration required' });
+    return res.status(400).json({ error: 'description and duration are required' });
   }
 
-  const exerciseDate = date ? new Date(date) : new Date();
-  if (exerciseDate.toString() === 'Invalid Date') {
+  const parsedDate = date ? new Date(date) : new Date();
+  if (parsedDate.toString() === 'Invalid Date') {
     return res.status(400).json({ error: 'Invalid date format' });
   }
 
@@ -51,14 +54,14 @@ app.post('/api/users/:_id/exercises', (req, res) => {
     username: user.username,
     description,
     duration: parseInt(duration),
-    date: exerciseDate.toDateString()
+    date: parsedDate.toDateString()
   };
 
   exercises.push(exercise);
   res.json(exercise);
 });
 
-// ✅ Get user logs
+// ✅ Get exercise logs
 app.get('/api/users/:_id/logs', (req, res) => {
   const user = users.find(u => u._id === req.params._id);
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -92,11 +95,12 @@ app.get('/api/users/:_id/logs', (req, res) => {
     log: log.map(({ description, duration, date }) => ({
       description,
       duration,
-      date
+      date: new Date(date).toDateString() // ✅ هذا مهم للتوافق مع التحدي
     }))
   });
 });
 
+// Start the server
 const listener = app.listen(3000, () => {
   console.log('Your app is listening on port ' + listener.address().port);
 });
