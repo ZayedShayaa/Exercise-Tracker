@@ -1,49 +1,61 @@
+require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const dns = require('dns');
-const { URL } = require('url');
+const bodyParser = require('body-parser');
+const urlParser = require('url');
 
 const app = express();
 
-// دعم استقبال بيانات form-urlencoded و JSON
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+// Basic Configuration
+const port = process.env.PORT || 3000;
 
-const urlDatabase = [];
-let id = 1;
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: false })); // مهم لاستقبال بيانات POST من form-url-encoded
 
+app.use('/public', express.static(`${process.cwd()}/public`));
+
+app.get('/', function(req, res) {
+  res.sendFile(process.cwd() + '/views/index.html');
+});
+
+// تخزين الروابط
+let urlDatabase = [];
+let id = 1; // رقم مختصر يزيد تلقائي
+
+// POST endpoint لاستقبال رابط
 app.post('/api/shorturl', (req, res) => {
-  let originalUrl = req.body.url;
+  const originalUrl = req.body.url;
 
-  if (!originalUrl || !originalUrl.match(/^(http|https):\/\/.+$/)) {
+  // التحقق من صحة الرابط باستخدام url module (فحص البروتوكول)
+  let urlObject;
+  try {
+    urlObject = new URL(originalUrl);
+  } catch (err) {
     return res.json({ error: 'invalid url' });
   }
 
-  try {
-    const urlObj = new URL(originalUrl);
-
-    dns.lookup(urlObj.hostname, (err) => {
-      if (err) {
-        return res.json({ error: 'invalid url' });
+  // نتحقق من وجود الدومين باستخدام dns.lookup
+  dns.lookup(urlObject.hostname, (err) => {
+    if (err) {
+      return res.json({ error: 'invalid url' });
+    } else {
+      // هل الرابط موجود مسبقًا؟
+      const found = urlDatabase.find(item => item.original_url === originalUrl);
+      if (found) {
+        // إذا موجود، نعيده بدون إضافة جديد
+        res.json({ original_url: found.original_url, short_url: found.short_url });
       } else {
-        const found = urlDatabase.find(item => item.original_url === originalUrl);
-        if (found) {
-          return res.json({ original_url: found.original_url, short_url: found.short_url });
-        }
-
+        // غير موجود، نضيفه مع ID جديد
         urlDatabase.push({ original_url: originalUrl, short_url: id });
         res.json({ original_url: originalUrl, short_url: id });
         id++;
       }
-    });
-  } catch {
-    return res.json({ error: 'invalid url' });
-  }
+    }
+  });
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/view/index.html');
-});
-
+// GET endpoint لإعادة التوجيه
 app.get('/api/shorturl/:short_url', (req, res) => {
   const shortUrl = Number(req.params.short_url);
   const found = urlDatabase.find(item => item.short_url === shortUrl);
@@ -55,7 +67,6 @@ app.get('/api/shorturl/:short_url', (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is listening on port ${PORT}`);
+app.listen(port, function() {
+  console.log(`Listening on port ${port}`);
 });
