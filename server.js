@@ -93,44 +93,44 @@ app.post('/api/exercise/add', bodyParser.urlencoded({ extended: false }) , (requ
 })
 
 app.get('/api/exercise/log', (request, response) => {
-  
   User.findById(request.query.userId, (error, result) => {
-    if(!error){
-      let responseObject = result
-      
-      if(request.query.from || request.query.to){
-        
-        let fromDate = new Date(0)
-        let toDate = new Date()
-        
-        if(request.query.from){
-          fromDate = new Date(request.query.from)
-        }
-        
-        if(request.query.to){
-          toDate = new Date(request.query.to)
-        }
-        
-        fromDate = fromDate.getTime()
-        toDate = toDate.getTime()
-        
+    if (!error && result) {
+      let responseObject = result.toJSON();
+
+      // فلترة التمارين حسب from و to إن وجدت
+      if (request.query.from || request.query.to) {
+        let fromDate = new Date(0);  // بداية الزمن
+        let toDate = new Date();     // الآن
+
+        if (request.query.from) fromDate = new Date(request.query.from);
+        if (request.query.to) toDate = new Date(request.query.to);
+
+        fromDate = fromDate.getTime();
+        toDate = toDate.getTime();
+
         responseObject.log = responseObject.log.filter((session) => {
-          let sessionDate = new Date(session.date).getTime()
-          
-          return sessionDate >= fromDate && sessionDate <= toDate
-          
-        })
-        
+          let sessionDate = new Date(session.date).getTime();
+          return sessionDate >= fromDate && sessionDate <= toDate;
+        });
       }
-      
-      if(request.query.limit){
-        responseObject.log = responseObject.log.slice(0, request.query.limit)
+
+      // تطبيق limit
+      if (request.query.limit) {
+        responseObject.log = responseObject.log.slice(0, Number(request.query.limit));
       }
-      
-      responseObject = responseObject.toJSON()
-      responseObject['count'] = result.log.length
-      response.json(responseObject)
+
+      // تحويل تاريخ كل جلسة ل toDateString()
+      responseObject.log = responseObject.log.map(session => ({
+        description: session.description,
+        duration: session.duration,
+        date: new Date(session.date).toDateString()
+      }));
+
+      responseObject.count = responseObject.log.length;
+
+      response.json(responseObject);
+    } else {
+      response.status(400).json({ error: 'User not found' });
     }
-  })
-  
-})
+  });
+});
