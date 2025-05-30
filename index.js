@@ -43,6 +43,10 @@ app.post('/api/shorturl', (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
 // GET endpoint لإعادة التوجيه حسب رقم الاختصار
 app.get('/api/shorturl/:short_url', (req, res) => {
   const shortUrl = Number(req.params.short_url);

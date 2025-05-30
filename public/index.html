@@ -1,11 +1,12 @@
-<!-- public/index.html -->
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Request Header Parser</title>
-  </head>
-  <body>
-    <h1>Request Header Parser Microservice</h1>
-    <p>Use <code>/api/whoami</code> to get your IP, language, and software info.</p>
-  </body>
+<head><title>URL Shortener</title></head>
+<body>
+  <h1>URL Shortener Microservice</h1>
+  <form method="POST" action="/api/shorturl">
+    <label for="url">Enter URL to shorten:</label><br>
+    <input type="text" name="url" id="url" placeholder="https://example.com" required>
+    <button type="submit">Shorten</button>
+  </form>
+</body>
 </html>
