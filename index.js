@@ -1,35 +1,30 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const path = require('path');
-
 const app = express();
-const PORT = 3000;
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const { v4: uuidv4 } = require('uuid');
 
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static('views'));
+app.use(express.static('public'));
+app.set('view engine', 'ejs');
 
-// بيانات مؤقتة (بدون قاعدة بيانات)
-let users = [];       // [{ username, _id }]
-let exercises = [];   // [{ userId, description, duration, date, _id }]
+const users = [];  // لتخزين المستخدمين
+const exercises = [];  // لتخزين التمارين
 
-// توليد ID عشوائي بسيط
-function generateId() {
-  return Math.random().toString(36).substring(2, 10);
-}
-
-// صفحة الإدخال الأساسية
+// صفحة البداية
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+  res.sendFile(__dirname + '/views/index.html');
 });
 
 // إنشاء مستخدم جديد
 app.post('/api/users', (req, res) => {
-  const { username } = req.body;
+  const username = req.body.username;
   if (!username) return res.status(400).json({ error: 'username required' });
 
-  const newUser = { username, _id: generateId() };
-  users.push(newUser);
-  res.json(newUser);
+  const user = { username, _id: uuidv4() };
+  users.push(user);
+  res.json(user);
 });
 
 // جلب كل المستخدمين
@@ -43,76 +38,66 @@ app.post('/api/users/:_id/exercises', (req, res) => {
   const user = users.find(u => u._id === userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  let { description, duration, date } = req.body;
+  const { description, duration, date } = req.body;
   if (!description || !duration) return res.status(400).json({ error: 'description and duration required' });
 
-  duration = Number(duration);
-  if (isNaN(duration)) return res.status(400).json({ error: 'duration must be a number' });
-
-  date = date ? new Date(date) : new Date();
-  if (date.toString() === 'Invalid Date') date = new Date();
+  const exerciseDate = date ? new Date(date) : new Date();
+  if (exerciseDate.toString() === 'Invalid Date') return res.status(400).json({ error: 'Invalid date format' });
 
   const exercise = {
-    userId,
     description,
-    duration,
-    date,
-    _id: generateId(),
+    duration: parseInt(duration),
+    date: exerciseDate.toDateString(),
+    _id: userId
   };
   exercises.push(exercise);
 
   res.json({
+    _id: user._id,
     username: user.username,
-    description: exercise.description,
+    date: exercise.date,
     duration: exercise.duration,
-    date: exercise.date.toDateString(),
-    _id: user._id
+    description: exercise.description
   });
 });
 
-// عرض سجل التمارين لمستخدم (اختياري فلتر من - إلى - حد عدد)
+// جلب سجل التمارين لمستخدم
 app.get('/api/users/:_id/logs', (req, res) => {
   const userId = req.params._id;
   const user = users.find(u => u._id === userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  let { from, to, limit } = req.query;
+  let userExercises = exercises.filter(ex => ex._id === userId);
 
-  let userExercises = exercises.filter(e => e.userId === userId);
+  // فلترة based on from, to, limit
+  const { from, to, limit } = req.query;
 
   if (from) {
     const fromDate = new Date(from);
-    if (fromDate.toString() !== 'Invalid Date') {
-      userExercises = userExercises.filter(e => e.date >= fromDate);
-    }
+    if (fromDate.toString() !== 'Invalid Date')
+      userExercises = userExercises.filter(ex => new Date(ex.date) >= fromDate);
   }
 
   if (to) {
     const toDate = new Date(to);
-    if (toDate.toString() !== 'Invalid Date') {
-      userExercises = userExercises.filter(e => e.date <= toDate);
-    }
+    if (toDate.toString() !== 'Invalid Date')
+      userExercises = userExercises.filter(ex => new Date(ex.date) <= toDate);
   }
 
   if (limit) {
-    limit = Number(limit);
-    if (!isNaN(limit)) {
-      userExercises = userExercises.slice(0, limit);
-    }
+    userExercises = userExercises.slice(0, parseInt(limit));
   }
 
+  const log = userExercises.map(({ description, duration, date }) => ({ description, duration, date }));
+
   res.json({
-    username: user.username,
-    count: userExercises.length,
     _id: user._id,
-    log: userExercises.map(e => ({
-      description: e.description,
-      duration: e.duration,
-      date: e.date.toDateString()
-    }))
+    username: user.username,
+    count: log.length,
+    log
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const listener = app.listen(3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port);
 });
