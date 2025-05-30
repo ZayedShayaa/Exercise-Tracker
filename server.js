@@ -25,7 +25,7 @@ app.get('/', (req, res) => {
 });
 
 // استيراد واستخدام مسارات API
-const apiRouter = require('./routes/api'); // تأكد من أن المسار صحيح لمكان api.js
+const apiRouter = require('./routes/exercise'); // تأكد من أن المسار صحيح لمكان api.js
 app.use('/api/users', apiRouter); // استخدام الراوتر عند المسار /api/users
 
 // معالجة الأخطاء 404
