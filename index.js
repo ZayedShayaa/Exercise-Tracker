@@ -160,7 +160,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
       log: userLog.map(ex => ({
         description: ex.description,
         duration: ex.duration,
-        date: ex.date,
+        date: new Date(ex.date).toDateString(),
       })),
     });
   } catch (err) {
