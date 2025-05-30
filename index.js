@@ -2,45 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// enable CORS for FCC testing
 app.use(cors());
-
-// serve the static HTML file
 app.use(express.static('public'));
 
-// Main API Route
-app.get("/api/:date?", (req, res) => {
-  let { date } = req.params;
+// الصفحة الرئيسية (HTML)
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
 
-  // إذا لم يُعطى تاريخ
-  if (!date) {
-    const now = new Date();
-    return res.json({ unix: now.getTime(), utc: now.toUTCString() });
-  }
+// المسار المطلوب للتحدي
+app.get('/api/whoami', (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  const language = req.headers['accept-language'];
+  const software = req.headers['user-agent'];
 
-  // لو كانت أرقام فقط، نحولها إلى رقم (timestamp)
-  if (/^\d+$/.test(date)) {
-    date = parseInt(date);
-  }
-
-  const parsedDate = new Date(date);
-
-  if (parsedDate.toString() === "Invalid Date") {
-    return res.json({ error: "Invalid Date" });
-  }
-
-  return res.json({
-    unix: parsedDate.getTime(),
-    utc: parsedDate.toUTCString()
+  res.json({
+    ipaddress: ip,
+    language: language,
+    software: software
   });
 });
 
-// السطر الإجباري لمنصة FreeCodeCamp
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
-});
-
+// تشغيل السيرفر
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
