@@ -1,13 +1,12 @@
-// 1. تحميل الوحدات والمتغيرات البيئية
-require("dotenv").config(); // لتحميل متغيرات البيئة من ملف .env
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const path = require("path"); // للتعامل مع مسارات الملفات
+const path = require("path");
 
-const app = express(); // إنشاء تطبيق Express
+const app = express();
 
-// 2. الاتصال بقاعدة البيانات MongoDB
+// الاتصال بقاعدة البيانات
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -16,47 +15,44 @@ mongoose
   .then(() => console.log("MongoDB connected successfully!"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// 3. تعريف مخططات Mongoose (Models)
+// مخططات Mongoose
 const exerciseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   duration: { type: Number, required: true },
-  date: { type: String }, // تاريخ التمرين كسلسلة نصية (مثال: Mon Jan 01 1990)
+  date: { type: String }, // التاريخ كسلسلة نصية (مثلاً: "Mon Jan 01 1990")
 });
 
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  log: [exerciseSchema], // مصفوفة من التمارين
+  log: [exerciseSchema],
 });
 
-const User = mongoose.model("User", userSchema); // إنشاء الموديل بناءً على المخطط
+const User = mongoose.model("User", userSchema);
 
-// 4. Middleware (البرمجيات الوسيطة)
-app.use(cors()); // تفعيل CORS للسماح بطلبات من نطاقات مختلفة
-app.use(express.static(path.join(__dirname, "public"))); // لخدمة الملفات الثابتة (مثل CSS إذا أضفتها)
-app.use(express.urlencoded({ extended: true })); // لتحليل بيانات النموذج (form data)
+// Middleware
+app.use(cors());
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({ extended: true }));
 
-// 5. نقاط نهاية API (Routes)
+// Routes
 
-// نقطة نهاية لعرض الصفحة الرئيسية
+// الصفحة الرئيسية
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
-// POST /api/users - إنشاء مستخدم جديد
+// إنشاء مستخدم جديد
 app.post("/api/users", async (req, res) => {
-  const username = req.body.username; // استلام username من form data
-
+  const username = req.body.username;
   if (!username) {
     return res.status(400).json({ error: "Username is required" });
   }
-
   try {
     const newUser = new User({ username });
     const savedUser = await newUser.save();
     res.json({ username: savedUser.username, _id: savedUser._id });
   } catch (err) {
     if (err.code === 11000) {
-      // MongoDB duplicate key error (اسم المستخدم موجود بالفعل)
       return res.status(409).json({ error: "Username already exists" });
     }
     console.error("Error creating user:", err);
@@ -64,10 +60,10 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// GET /api/users - جلب قائمة بجميع المستخدمين
+// جلب جميع المستخدمين
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find({}, "username _id"); // جلب فقط username و _id
+    const users = await User.find({}, "username _id");
     res.json(users);
   } catch (err) {
     console.error("Error getting users:", err);
@@ -75,15 +71,13 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-// POST /api/users/:_id/exercises - إضافة تمرين لسجل المستخدم
+// إضافة تمرين جديد للمستخدم
 app.post("/api/users/:id/exercises", async (req, res) => {
   const userId = req.params.id;
-  const { description, duration, date } = req.body; // استلام البيانات من form data
+  const { description, duration, date } = req.body;
 
   if (!description || !duration) {
-    return res
-      .status(400)
-      .json({ error: "Description and duration are required." });
+    return res.status(400).json({ error: "Description and duration are required." });
   }
 
   try {
@@ -96,18 +90,16 @@ app.post("/api/users/:id/exercises", async (req, res) => {
     if (date) {
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
-        return res
-          .status(400)
-          .json({ error: "Invalid date format. Use YYYY-MM-DD." });
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
       }
-      exerciseDate = parsedDate.toDateString(); // حفظ التاريخ كسلسلة نصية بتنسيق DateString
+      exerciseDate = parsedDate.toDateString();
     } else {
-      exerciseDate = new Date().toDateString(); // التاريخ الحالي كسلسلة نصية بتنسيق DateString
+      exerciseDate = new Date().toDateString();
     }
 
     const newExercise = {
       description,
-      duration: parseInt(duration), // التأكد من أن duration هو رقم
+      duration: parseInt(duration),
       date: exerciseDate,
     };
 
@@ -127,7 +119,7 @@ app.post("/api/users/:id/exercises", async (req, res) => {
   }
 });
 
-// GET /api/users/:_id/logs - جلب سجل تمارين المستخدم
+// جلب سجل التمارين مع الفلاتر
 app.get("/api/users/:id/logs", async (req, res) => {
   const userId = req.params.id;
   const { from, to, limit } = req.query;
@@ -140,33 +132,23 @@ app.get("/api/users/:id/logs", async (req, res) => {
 
     let userLog = user.log;
 
-    // تصفية حسب التاريخ "من"
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
-        // التأكد من أن التاريخ صالح
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
-        );
+        userLog = userLog.filter(ex => new Date(ex.date).getTime() >= fromDate.getTime());
       }
     }
 
-    // تصفية حسب التاريخ "إلى"
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
-        // التأكد من أن التاريخ صالح
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() <= toDate.getTime()
-        );
+        userLog = userLog.filter(ex => new Date(ex.date).getTime() <= toDate.getTime());
       }
     }
 
-    // تطبيق حد السجلات
     if (limit) {
       const limitNum = parseInt(limit);
       if (!isNaN(limitNum) && limitNum > 0) {
-        // التأكد من أن الحد رقم موجب
         userLog = userLog.slice(0, limitNum);
       }
     }
@@ -175,10 +157,10 @@ app.get("/api/users/:id/logs", async (req, res) => {
       _id: user._id,
       username: user.username,
       count: userLog.length,
-      log: userLog.map((ex) => ({
+      log: userLog.map(ex => ({
         description: ex.description,
         duration: ex.duration,
-        date: ex.date, // هذا هو السطر الصحيح. لا تقم بأي تحويل هنا.
+        date: ex.date,
       })),
     });
   } catch (err) {
@@ -187,18 +169,18 @@ app.get("/api/users/:id/logs", async (req, res) => {
   }
 });
 
-// 6. معالجة أخطاء 404
+// 404 handler
 app.use((req, res, next) => {
   res.status(404).send("404 Not Found");
 });
 
-// 7. معالج الأخطاء العام
+// general error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send("Something broke!");
 });
 
-// 8. بدء تشغيل الخادم
+// تشغيل السيرفر
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Your app is listening on port " + listener.address().port);
 });
