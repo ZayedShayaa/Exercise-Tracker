@@ -16,7 +16,6 @@ mongoose.connect(process.env.MONGO_URI, {
 .catch(err => console.error('MongoDB connection error:', err));
 
 // 3. تعريف مخططات Mongoose (Models)
-// هذا بديل لملف models/user.js
 const exerciseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   duration: { type: Number, required: true },
@@ -34,10 +33,8 @@ const User = mongoose.model('User', userSchema); // إنشاء الموديل ب
 app.use(cors()); // تفعيل CORS للسماح بطلبات من نطاقات مختلفة
 app.use(express.static(path.join(__dirname, 'public'))); // لخدمة الملفات الثابتة (مثل CSS إذا أضفتها)
 app.use(express.urlencoded({ extended: true })); // لتحليل بيانات النموذج (form data)
-// app.use(express.json()); // إذا كنت تخطط لإرسال JSON من الواجهة الأمامية، يمكن تفعيلها أيضًا
 
 // 5. نقاط نهاية API (Routes)
-// هذه بديل لملف routes/api.js
 
 // نقطة نهاية لعرض الصفحة الرئيسية
 app.get('/', (req, res) => {
@@ -81,7 +78,6 @@ app.post('/api/users/:id/exercises', async (req, res) => {
   const userId = req.params.id;
   const { description, duration, date } = req.body; // استلام البيانات من form data
 
-  // التحقق من الحقول المطلوبة
   if (!description || !duration) {
     return res.status(400).json({ error: 'Description and duration are required.' });
   }
@@ -92,29 +88,26 @@ app.post('/api/users/:id/exercises', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // تهيئة التاريخ: إذا لم يتم توفيره، استخدم التاريخ الحالي
     let exerciseDate;
     if (date) {
-      // حاول تحليل التاريخ المدخل
       const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) { // التحقق من صلاحية التاريخ
+      if (isNaN(parsedDate.getTime())) {
         return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
       }
-      exerciseDate = parsedDate.toDateString(); // تحويل التاريخ إلى DateString
+      exerciseDate = parsedDate.toDateString();
     } else {
-      exerciseDate = new Date().toDateString(); // التاريخ الحالي بصيغة DateString
+      exerciseDate = new Date().toDateString();
     }
 
     const newExercise = {
       description,
-      duration: parseInt(duration), // تحويل المدة إلى عدد صحيح
+      duration: parseInt(duration),
       date: exerciseDate
     };
 
-    user.log.push(newExercise); // إضافة التمرين إلى سجل المستخدم
-    const updatedUser = await user.save(); // حفظ التغييرات في قاعدة البيانات
+    user.log.push(newExercise);
+    const updatedUser = await user.save();
 
-    // العودة ببيانات المستخدم والتمرين المضاف بنفس بنية الاستجابة المطلوبة
     res.json({
       _id: updatedUser._id,
       username: updatedUser.username,
@@ -132,7 +125,7 @@ app.post('/api/users/:id/exercises', async (req, res) => {
 // GET /api/users/:_id/logs - جلب سجل تمارين المستخدم
 app.get('/api/users/:id/logs', async (req, res) => {
   const userId = req.params.id;
-  const { from, to, limit } = req.query; // استلام parameters (من، إلى، حد)
+  const { from, to, limit } = req.query;
 
   try {
     const user = await User.findById(userId);
@@ -142,7 +135,6 @@ app.get('/api/users/:id/logs', async (req, res) => {
 
     let userLog = user.log;
 
-    // تطبيق فلترة 'from' (من تاريخ معين)
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
@@ -150,7 +142,6 @@ app.get('/api/users/:id/logs', async (req, res) => {
       }
     }
 
-    // تطبيق فلترة 'to' (إلى تاريخ معين)
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
@@ -158,24 +149,22 @@ app.get('/api/users/:id/logs', async (req, res) => {
       }
     }
 
-    // تطبيق 'limit' (الحد الأقصى لعدد السجلات)
     if (limit) {
       const limitNum = parseInt(limit);
-      if (!isNaN(limitNum) && limitNum > 0) { // تأكد من أن Limit رقم موجب
+      if (!isNaN(limitNum) && limitNum > 0) {
         userLog = userLog.slice(0, limitNum);
       }
     }
 
-    // العودة ببيانات السجل بنفس بنية الاستجابة المطلوبة
     res.json({
       _id: user._id,
       username: user.username,
       count: userLog.length,
-     log: userLog.map(ex => ({
-  description: ex.description,
-  duration: ex.duration,
-  date: ex.date // <--- فقط استخدم القيمة المخزنة مباشرة!
-}))
+      log: userLog.map(ex => ({
+        description: ex.description,
+        duration: ex.duration,
+        date: new Date(ex.date).toDateString()  // التعديل هنا: التاريخ كنص
+      }))
     });
 
   } catch (err) {
@@ -184,7 +173,7 @@ app.get('/api/users/:id/logs', async (req, res) => {
   }
 });
 
-// 6. معالجة الأخطاء 404
+// 6. معالجة أخطاء 404
 app.use((req, res, next) => {
   res.status(404).send('404 Not Found');
 });
