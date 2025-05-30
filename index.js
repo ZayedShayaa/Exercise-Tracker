@@ -19,8 +19,7 @@ mongoose
 const exerciseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   duration: { type: Number, required: true },
-  date: { type: Date },
-  // التاريخ كسلسلة نصية (مثلاً: "Mon Jan 01 1990")
+  date: { type: Date }, // ✅ تم تغيير النوع إلى Date
 });
 
 const userSchema = new mongoose.Schema({
@@ -97,9 +96,9 @@ app.post("/api/users/:id/exercises", async (req, res) => {
           .status(400)
           .json({ error: "Invalid date format. Use YYYY-MM-DD." });
       }
-      exerciseDate = parsedDate; // ✅ حفظ كتاريخ
+      exerciseDate = parsedDate; // ✅ حفظ كتاريخ (Date object)
     } else {
-      exerciseDate = new Date(); // ✅ بدون تحويله لنص
+      exerciseDate = new Date(); // ✅ حفظ كتاريخ (Date object)
     }
 
     const newExercise = {
@@ -116,7 +115,7 @@ app.post("/api/users/:id/exercises", async (req, res) => {
       username: updatedUser.username,
       description: newExercise.description,
       duration: newExercise.duration,
-      date: newExercise.date,
+      date: new Date(newExercise.date).toDateString(), // ✅ هنا يتم تحويل التاريخ لـ string قبل الإرسال
     });
   } catch (err) {
     console.error("Error adding exercise:", err);
@@ -137,6 +136,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
 
     let userLog = user.log;
 
+    // تصفية حسب التاريخ "من"
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
@@ -146,6 +146,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
       }
     }
 
+    // تصفية حسب التاريخ "إلى"
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
@@ -155,6 +156,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
       }
     }
 
+    // تطبيق حد السجلات
     if (limit) {
       const limitNum = parseInt(limit);
       if (!isNaN(limitNum) && limitNum > 0) {
@@ -169,7 +171,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
       log: userLog.map((ex) => ({
         description: ex.description,
         duration: ex.duration,
-        date: new Date(ex.date).toDateString(), // ✅ إخراج التاريخ كـ string فقط هنا
+        date: new Date(ex.date).toDateString(), // ✅ هنا يتم تحويل التاريخ لـ string قبل الإرسال
       })),
     });
   } catch (err) {
