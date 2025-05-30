@@ -1,108 +1,136 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const { v4: uuidv4 } = require("uuid");
-const app = express();
+const express = require('express')
+const app = express()
+const bodyParser = require('body-parser')
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static("public"));
+const cors = require('cors')
 
-// In-memory data storage
-const users = [];
-const exercises = [];
+const mongoose = require('mongoose')
+require('dotenv').config();
 
-// Home page
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Connection error:', err));
+
+app.use(cors())
+
+app.use(express.static('public'))
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/views/index.html')
 });
 
-// ✅ Create a new user
-app.post("/api/users", (req, res) => {
-  const username = req.body.username;
-  const newUser = {
-    username,
-    _id: uuidv4(),
-  };
-  users.push(newUser);
-  res.json(newUser);
-});
 
-// ✅ Get all users
-app.get("/api/users", (req, res) => {
-  res.json(users);
-});
 
-// ✅ Add exercise to a user
-app.post("/api/users/:_id/exercises", (req, res) => {
-  const user = users.find((u) => u._id === req.params._id);
-  if (!user) return res.status(404).json({ error: "User not found" });
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port)
+})
 
-  const { description, duration, date } = req.body;
-  if (!description || !duration) {
-    return res
-      .status(400)
-      .json({ error: "description and duration are required" });
+
+let exerciseSessionSchema = new mongoose.Schema({
+  description: {type: String, required: true},
+  duration: {type: Number, required: true},
+  date: String
+})
+
+let userSchema = new mongoose.Schema({
+  username: {type: String, required: true},
+  log: [exerciseSessionSchema]
+})
+
+let Session = mongoose.model('Session', exerciseSessionSchema)
+let User = mongoose.model('User', userSchema)
+
+app.post('/api/exercise/new-user', bodyParser.urlencoded({ extended: false }), async (request, response) => {
+  try {
+    let newUser = new User({ username: request.body.username });
+    let savedUser = await newUser.save();
+    response.json({
+      username: savedUser.username,
+      _id: savedUser.id
+    });
+  } catch (error) {
+    response.status(500).json({ error: 'Failed to save user' });
   }
-
-  const parsedDate = date ? new Date(date) : new Date();
-  if (parsedDate.toString() === "Invalid Date") {
-    return res.status(400).json({ error: "Invalid date format" });
-  }
-
-  const exercise = {
-    _id: user._id,
-    username: user.username,
-    description,
-    duration: parseInt(duration),
-    date: exerciseDate, // ← بدون toDateString()
-  };
-
-  exercises.push(exercise);
-  res.json(exercise);
 });
 
-// ✅ Get exercise logs
-app.get("/api/users/:_id/logs", (req, res) => {
-  const user = users.find((u) => u._id === req.params._id);
-  if (!user) return res.status(404).json({ error: "User not found" });
-
-  let log = exercises.filter((ex) => ex._id === user._id);
-
-  const { from, to, limit } = req.query;
-
-  if (from) {
-    const fromDate = new Date(from);
-    if (fromDate.toString() !== "Invalid Date") {
-      log = log.filter((ex) => new Date(ex.date) >= fromDate);
+app.get('/api/exercise/users', (request, response) => {
+  
+  User.find({}, (error, arrayOfUsers) => {
+    if(!error){
+      response.json(arrayOfUsers)
     }
-  }
+  })
+  
+})
 
-  if (to) {
-    const toDate = new Date(to);
-    if (toDate.toString() !== "Invalid Date") {
-      log = log.filter((ex) => new Date(ex.date) <= toDate);
+app.post('/api/exercise/add', bodyParser.urlencoded({ extended: false }) , (request, response) => {
+  
+  let newSession = new Session({
+    description: request.body.description,
+    duration: parseInt(request.body.duration),
+    date: request.body.date
+  })
+  
+  if(newSession.date === ''){
+    newSession.date = new Date().toISOString().substring(0, 10)
+  }
+  
+  User.findByIdAndUpdate(
+    request.body.userId,
+    {$push : {log: newSession}},
+    {new: true},
+    (error, updatedUser)=> {
+      if(!error){
+        let responseObject = {}
+        responseObject['_id'] = updatedUser.id
+        responseObject['username'] = updatedUser.username
+        responseObject['date'] = new Date(newSession.date).toDateString()
+        responseObject['description'] = newSession.description
+        responseObject['duration'] = newSession.duration
+        response.json(responseObject)
+      }
     }
-  }
+  )
+})
 
-  if (limit) {
-    log = log.slice(0, parseInt(limit));
-  }
-
-  res.json({
-    username: user.username,
-    count: log.length,
-    _id: user._id,
-    log: log.map(({ description, duration, date }) => ({
-      description,
-      duration,
-      date: new Date(date).toDateString(), // ✅ هذا هو المفتاح!
-    })),
-  });
-});
-
-// Start the server
-const listener = app.listen(3000, () => {
-  console.log("Your app is listening on port " + listener.address().port);
-});
+app.get('/api/exercise/log', (request, response) => {
+  
+  User.findById(request.query.userId, (error, result) => {
+    if(!error){
+      let responseObject = result
+      
+      if(request.query.from || request.query.to){
+        
+        let fromDate = new Date(0)
+        let toDate = new Date()
+        
+        if(request.query.from){
+          fromDate = new Date(request.query.from)
+        }
+        
+        if(request.query.to){
+          toDate = new Date(request.query.to)
+        }
+        
+        fromDate = fromDate.getTime()
+        toDate = toDate.getTime()
+        
+        responseObject.log = responseObject.log.filter((session) => {
+          let sessionDate = new Date(session.date).getTime()
+          
+          return sessionDate >= fromDate && sessionDate <= toDate
+          
+        })
+        
+      }
+      
+      if(request.query.limit){
+        responseObject.log = responseObject.log.slice(0, request.query.limit)
+      }
+      
+      responseObject = responseObject.toJSON()
+      responseObject['count'] = result.log.length
+      response.json(responseObject)
+    }
+  })
+  
+})
