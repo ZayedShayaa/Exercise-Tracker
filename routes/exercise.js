@@ -70,10 +70,11 @@ router.get('/:id/logs', async (req, res) => {
     username: user.username,
     count: log.length,
     log: log.map(e => ({
-      description: e.description,
-      duration: e.duration,
-      date: new Date(e.date).toDateString()
-    }))
+  description: e.description,
+  duration: e.duration,
+  date: e.date // لأنه محفوظ مسبقًا كنص من toDateString
+}))
+
   });
 });
 
