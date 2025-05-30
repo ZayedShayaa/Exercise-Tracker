@@ -2,31 +2,34 @@ require('dotenv').config(); // تحميل متغيرات البيئة من مل�
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const path = require('path'); // لاستخدام مسارات الملفات بشكل صحيح
+const path = require('path');
 
 const app = express();
 
-// إعداد الاتصال بقاعدة البيانات MongoDB
+// الاتصال بقاعدة البيانات MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-});
+})
+.then(() => console.log('MongoDB connected...'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Middleware
-app.use(cors()); // تفعيل CORS للسماح بطلبات من نطاقات مختلفة
-app.use(express.json()); // تحليل طلبات JSON
+app.use(cors()); // تفعيل CORS
+app.use(express.static(path.join(__dirname, 'public'))); // لخدمة الملفات الثابتة (مثل CSS)
 app.use(express.urlencoded({ extended: true })); // تحليل بيانات النموذج (form data)
+// app.use(express.json()); // إذا كنت تخطط لإرسال JSON من الواجهة الأمامية، يمكن تفعيلها أيضًا
+
+// استيراد مسارات API
+const apiRoutes = require('./routes/exercise');
 
 // نقطة نهاية لعرض الصفحة الرئيسية
-// تأكد من أن مسار 'views' صحيح بالنسبة لمكان server.js
-app.use(express.static(path.join(__dirname, 'public'))); // لتقديم ملفات CSS/JS الثابتة إذا كانت في مجلد public
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+  res.sendFile(path.join(__dirname,  '/view/index.html'));
 });
 
-// استيراد واستخدام مسارات API
-const apiRouter = require('./routes/exercise'); // تأكد من أن المسار صحيح لمكان api.js
-app.use('/api/users', apiRouter); // استخدام الراوتر عند المسار /api/users
+// استخدام مسارات API عند /api/users
+app.use('/api/users', apiRoutes);
 
 // معالجة الأخطاء 404
 app.use((req, res, next) => {
@@ -40,7 +43,6 @@ app.use((err, req, res, next) => {
 });
 
 // بدء تشغيل الخادم
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Your app is listening on port ${port}`);
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port);
 });

@@ -2,104 +2,146 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/user'); // تأكد من المسار الصحيح لملف user.js
 
-// Create new user
+// 1. POST /api/users - Create a new user
 router.post('/', async (req, res) => {
-  const newUser = new User({ username: req.body.username });
+  const username = req.body.username; // استلام username من form data
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
   try {
+    const newUser = new User({ username });
     const savedUser = await newUser.save();
+    // العودة بنفس بنية الاستجابة المطلوبة: { username: "...", _id: "..." }
     res.json({ username: savedUser.username, _id: savedUser._id });
   } catch (err) {
-    // يمكن أن يكون الخطأ بسبب أن اسم المستخدم موجود بالفعل (unique)
-    if (err.code === 11000) { // كود الخطأ 11000 يشير إلى تكرار مفتاح فريد
+    if (err.code === 11000) { // MongoDB duplicate key error
       return res.status(409).json({ error: 'Username already exists' });
     }
-    console.error(err);
-    res.status(500).send('Error creating user');
+    console.error('Error creating user:', err);
+    res.status(500).json({ error: 'Server error creating user' });
   }
 });
 
-// Get all users
+// 2. GET /api/users - Get a list of all users
 router.get('/', async (req, res) => {
   try {
-    const users = await User.find({}, 'username _id');
+    const users = await User.find({}, 'username _id'); // جلب فقط username و _id
+    // العودة بمصفوفة من كائنات المستخدمين
     res.json(users);
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Error getting users');
+    console.error('Error getting users:', err);
+    res.status(500).json({ error: 'Server error getting users' });
   }
 });
 
-// Add exercise
+// 3. POST /api/users/:_id/exercises - Add an exercise to a user's log
 router.post('/:id/exercises', async (req, res) => {
-  const { description, duration, date } = req.body;
-  
-  // التحقق من أن المتغيرات موجودة
+  const userId = req.params.id;
+  const { description, duration, date } = req.body; // استلام البيانات من form data
+
+  // التحقق من الحقول المطلوبة
   if (!description || !duration) {
-    return res.status(400).json({ error: 'Description and duration are required' });
+    return res.status(400).json({ error: 'Description and duration are required.' });
   }
 
-  const user = await User.findById(req.params.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  const newExercise = {
-    description,
-    duration: parseInt(duration), // تأكد من تحويل المدة إلى رقم
-    // إذا كان التاريخ موجودًا، استخدمه، وإلا استخدم التاريخ الحالي
-    date: date ? new Date(date).toDateString() : new Date().toDateString()
-  };
-
-  user.log.push(newExercise);
   try {
-    await user.save();
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // تهيئة التاريخ: إذا لم يتم توفيره، استخدم التاريخ الحالي
+    let exerciseDate;
+    if (date) {
+      // حاول تحليل التاريخ المدخل
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) { // التحقق من صلاحية التاريخ
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+      }
+      exerciseDate = parsedDate.toDateString();
+    } else {
+      exerciseDate = new Date().toDateString(); // التاريخ الحالي بصيغة DateString
+    }
+
+    const newExercise = {
+      description,
+      duration: parseInt(duration), // تحويل المدة إلى عدد صحيح
+      date: exerciseDate
+    };
+
+    user.log.push(newExercise);
+    const updatedUser = await user.save();
+
+    // العودة ببيانات المستخدم والتمرين المضاف بنفس بنية الاستجابة المطلوبة
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      description: newExercise.description,
+      duration: newExercise.duration,
+      date: newExercise.date // التاريخ بصيغة toDateString()
+    });
+
+  } catch (err) {
+    console.error('Error adding exercise:', err);
+    res.status(500).json({ error: 'Server error adding exercise' });
+  }
+});
+
+// 4. GET /api/users/:_id/logs - Get a user's exercise log
+router.get('/:id/logs', async (req, res) => {
+  const userId = req.params.id;
+  const { from, to, limit } = req.query; // استلام parameters (من، إلى، حد)
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let userLog = user.log;
+
+    // تطبيق فلترة 'from'
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) {
+        userLog = userLog.filter(ex => new Date(ex.date).getTime() >= fromDate.getTime());
+      }
+    }
+
+    // تطبيق فلترة 'to'
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) {
+        userLog = userLog.filter(ex => new Date(ex.date).getTime() <= toDate.getTime());
+      }
+    }
+
+    // تطبيق 'limit'
+    if (limit) {
+      const limitNum = parseInt(limit);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        userLog = userLog.slice(0, limitNum);
+      }
+    }
+
+    // العودة ببيانات السجل بنفس بنية الاستجابة المطلوبة
     res.json({
       _id: user._id,
       username: user.username,
-      description: newExercise.description,
-      duration: newExercise.duration,
-      date: newExercise.date // التاريخ هنا هو بالفعل سلسلة نصية بالصيغة المطلوبة
+      count: userLog.length,
+      log: userLog.map(ex => ({
+        description: ex.description,
+        duration: ex.duration,
+        date: ex.date // هذا هو السطر الحاسم الذي يضمن أن التاريخ بصيغة DateString
+      }))
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Error adding exercise');
+    console.error('Error getting user log:', err);
+    res.status(500).json({ error: 'Server error getting user log' });
   }
-});
-
-// Get user log
-router.get('/:id/logs', async (req, res) => {
-  const { from, to, limit } = req.query;
-  const user = await User.findById(req.params.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  let log = user.log;
-
-  // فلترة السجل بناءً على التاريخ (من و إلى)
-  if (from) {
-    const fromDate = new Date(from);
-    log = log.filter(ex => new Date(ex.date).getTime() >= fromDate.getTime()); // مقارنة الأوقات
-  }
-  if (to) {
-    const toDate = new Date(to);
-    log = log.filter(ex => new Date(ex.date).getTime() <= toDate.getTime()); // مقارنة الأوقات
-  }
-
-  // تطبيق حد السجل (limit)
-  if (limit) {
-    const limitNum = parseInt(limit);
-    if (!isNaN(limitNum) && limitNum > 0) { // تأكد من أن Limit رقم موجب
-      log = log.slice(0, limitNum);
-    }
-  }
-
-  res.json({
-    _id: user._id,
-    username: user.username,
-    count: log.length,
-    log: log.map(e => ({
-      description: e.description,
-      duration: e.duration,
-      date: e.date // <--- هذا هو التصحيح الرئيسي الذي يجعل الاختبار يمر
-    }))
-  });
 });
 
 module.exports = router;
