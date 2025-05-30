@@ -55,12 +55,10 @@ router.get('/:id/logs', async (req, res) => {
     const fromDate = new Date(from);
     log = log.filter(ex => new Date(ex.date) >= fromDate);
   }
-
   if (to) {
     const toDate = new Date(to);
     log = log.filter(ex => new Date(ex.date) <= toDate);
   }
-
   if (limit) {
     log = log.slice(0, parseInt(limit));
   }
@@ -69,13 +67,13 @@ router.get('/:id/logs', async (req, res) => {
     _id: user._id,
     username: user.username,
     count: log.length,
-  log: log.map(e => ({
-  description: e.description,
-  duration: e.duration,
-  date: new Date(e.date).toDateString()
-}))
-
+    log: log.map(e => ({
+      description: e.description,
+      duration: e.duration,
+      date: new Date(e.date).toDateString()
+    }))
   });
 });
+
 
 module.exports = router;
