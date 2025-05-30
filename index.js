@@ -89,18 +89,16 @@ app.post("/api/users/:id/exercises", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    let exerciseDate;
-    if (date) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
-        return res
-          .status(400)
-          .json({ error: "Invalid date format. Use YYYY-MM-DD." });
-      }
-      exerciseDate = parsedDate.toDateString();
-    } else {
-      exerciseDate = new Date().toDateString();
-    }
+   let exerciseDate;
+if (date) {
+  const parsedDate = new Date(date);
+  if (isNaN(parsedDate.getTime())) {
+    return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+  }
+  exerciseDate = parsedDate; // <-- هذا هو التعديل
+} else {
+  exerciseDate = new Date(); // <-- نفس الشيء هنا
+}
 
     const newExercise = {
       description,
@@ -169,7 +167,8 @@ app.get("/api/users/:id/logs", async (req, res) => {
       log: userLog.map((ex) => ({
         description: ex.description,
         duration: ex.duration,
-        date: new Date(ex.date).toDateString(),
+        date: new Date(ex.date).toDateString()
+
       })),
     });
   } catch (err) {
