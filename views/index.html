@@ -1,48 +1,77 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Exercise Tracker | Free Code Camp</title>
-    <link
-      rel="shortcut icon"
-      href="https://nesh.gq/icon.png"
-      type="icon/png"
-    />
-    <link
-      href="https://fonts.googleapis.com/css?family=Roboto"
-      rel="stylesheet"
-      type="text/css"
-    />
-    <link href="style.css" rel="stylesheet" type="text/css" />
-  </head>
-
-  <body>
-    <h1>EXERCISE TRACKER</h1>
-    <form action="/api/exercise/new-user" method="post">
+<head>
+  <title>Exercise Tracker</title>
+  <link rel="shortcut icon" href="https://cdn.freecodecamp.org/universal/favicons/favicon-32x32.png" type="image/x-icon" />
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet" type="text/css">
+  <link href="style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+  <div class="container">
+    <h1>Exercise Tracker</h1>
+    <form action="/api/users" method="post">
       <h3>Create a New User</h3>
+      <p><code>POST /api/users</code></p>
       <input id="uname" type="text" name="username" placeholder="username" />
-      <input type="submit" value="Add" />
+      <input type="submit" value="Submit" />
     </form>
-    <h4>
-      Or ...
-    </h4>
-    <form action="/api/exercise/add" method="post">
-      <h3>Add Exercise Session</h3>
-      <input id="uid" type="text" name="userId" placeholder="userId*" />
-      <input
-        id="desc"
-        type="text"
-        name="description"
-        placeholder="description*"
-      />
-      <input
-        id="dur"
-        type="text"
-        name="duration"
-        placeholder="duration* (mins.)"
-      />
-      <input id="dat" type="text" name="date" placeholder="date (yyyy-mm-dd)" />
+    <form id="exercise-form"> <h3>Add Exercise Session</h3>
+      <p><code>POST /api/users/:_id/exercises</code></p>
+      <input id="uid" type="text" name="_id" placeholder="User ID*" /><br>
+      <input id="desc" type="text" name="description" placeholder="description*" /><br>
+      <input id="dur" type="text" name="duration" placeholder="duration* (mins.)" /><br>
+      <input id="date" type="text" name="date" placeholder="date (yyyy-mm-dd)" /><br>
       <input type="submit" value="Add Session" />
     </form>
-    <p>by <a href="https://nesh.gq">Ganesh H</a></p>
-  </body>
+    </div>
+
+  <script>
+    // هذا هو الجزء الذي يجب أن تضيفه أو تعدله في ملف JS (أو داخل <script> في index.html)
+    const exerciseForm = document.getElementById('exercise-form');
+
+    if (exerciseForm) {
+      exerciseForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); // منع الإرسال الافتراضي للنموذج (حتى لا يتم تحديث الصفحة)
+
+        // الحصول على القيم من حقول الإدخال
+        const userId = document.getElementById('uid').value;
+        const description = document.getElementById('desc').value;
+        const duration = document.getElementById('dur').value;
+        const date = document.getElementById('date').value;
+
+        // بناء عنوان URL الصحيح ديناميكيًا مع معرف المستخدم
+        const url = `/api/users/${userId}/exercises`;
+
+        // تجهيز بيانات النموذج للإرسال
+        const formData = new URLSearchParams();
+        formData.append('description', description);
+        formData.append('duration', duration);
+        if (date) { // أضف التاريخ فقط إذا كان موجودًا
+          formData.append('date', date);
+        }
+
+        try {
+          // إرسال الطلب باستخدام fetch API
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded' // مهم ليتعرف الخادم على البيانات كـ form data
+            },
+            body: formData // البيانات التي سيتم إرسالها
+          });
+
+          // تحليل الاستجابة من الخادم
+          const data = await response.json();
+
+          console.log(data); // اطبع الاستجابة في الكونسول لتراها
+          alert(JSON.stringify(data, null, 2)); // لعرض الاستجابة في نافذة منبثقة بسيطة
+          // يمكنك هنا تحديث واجهة المستخدم لعرض التمرين المضاف
+        } catch (error) {
+          console.error('Error adding exercise:', error);
+          alert('حدث خطأ أثناء إضافة التمرين. تحقق من الكونسول للمزيد من التفاصيل.');
+        }
+      });
+    }
+  </script>
+</body>
 </html>
