@@ -1,40 +1,46 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
-const path = require('path');
+// enable CORS for FCC testing
+app.use(cors());
 
-// عرض الصفحة الرئيسية من views/index.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '/public/index.html'));
-});
-app.get('/api/:date?', (req, res) => {
-  let dateString = req.params.date;
+// serve the static HTML file
+app.use(express.static('public'));
 
-  if (!dateString) {
-    return res.json({
-      unix: Date.now(),
-      utc: new Date().toUTCString()
-    });
+// Main API Route
+app.get("/api/:date?", (req, res) => {
+  let { date } = req.params;
+
+  // إذا لم يُعطى تاريخ
+  if (!date) {
+    const now = new Date();
+    return res.json({ unix: now.getTime(), utc: now.toUTCString() });
   }
 
-  // لو التاريخ فقط أرقام (timestamp) نحوله لعدد صحيح
-  if (/^\d+$/.test(dateString)) {
-    dateString = parseInt(dateString);
+  // لو كانت أرقام فقط، نحولها إلى رقم (timestamp)
+  if (/^\d+$/.test(date)) {
+    date = parseInt(date);
   }
 
-  const date = new Date(dateString);
+  const parsedDate = new Date(date);
 
-  if (date.toString() === "Invalid Date") {
+  if (parsedDate.toString() === "Invalid Date") {
     return res.json({ error: "Invalid Date" });
   }
 
-  res.json({
-    unix: date.getTime(),
-    utc: date.toUTCString()
+  return res.json({
+    unix: parsedDate.getTime(),
+    utc: parsedDate.toUTCString()
   });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// السطر الإجباري لمنصة FreeCodeCamp
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Listening on port ${port}`);
 });
