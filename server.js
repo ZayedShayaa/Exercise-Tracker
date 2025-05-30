@@ -2,30 +2,31 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-const exerciseRoutes = require('./routes/exercise');
+const userRoutes = require('./routes/users');
 
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Middlewares
+// Middleware
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+app.use('/public', express.static(`${process.cwd()}/public`));
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/exercise-tracker', {
   useNewUrlParser: true,
-  useUnifiedTopology: true,
+  useUnifiedTopology: true
 });
 
 // Routes
-app.use('/api/users', exerciseRoutes);
-
 app.get('/', (req, res) => {
-  res.send('Exercise Tracker API');
+  res.sendFile(process.cwd() + '/views/index.html');
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.use('/api/users', userRoutes);
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

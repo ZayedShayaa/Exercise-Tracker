@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
 
-// ✅ Create new user
+// Create new user
 router.post('/', async (req, res) => {
   const newUser = new User({ username: req.body.username });
   try {
@@ -13,13 +13,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ✅ Get all users
+// Get all users
 router.get('/', async (req, res) => {
   const users = await User.find({}, 'username _id');
   res.json(users);
 });
 
-// ✅ Add exercise
+// Add exercise
 router.post('/:id/exercises', async (req, res) => {
   const { description, duration, date } = req.body;
   const user = await User.findById(req.params.id);
@@ -43,7 +43,7 @@ router.post('/:id/exercises', async (req, res) => {
   });
 });
 
-// ✅ Get user log with optional filters
+// Get user log
 router.get('/:id/logs', async (req, res) => {
   const { from, to, limit } = req.query;
   const user = await User.findById(req.params.id);
@@ -55,10 +55,12 @@ router.get('/:id/logs', async (req, res) => {
     const fromDate = new Date(from);
     log = log.filter(ex => new Date(ex.date) >= fromDate);
   }
+
   if (to) {
     const toDate = new Date(to);
     log = log.filter(ex => new Date(ex.date) <= toDate);
   }
+
   if (limit) {
     log = log.slice(0, parseInt(limit));
   }
@@ -70,7 +72,7 @@ router.get('/:id/logs', async (req, res) => {
     log: log.map(e => ({
       description: e.description,
       duration: e.duration,
-      date: e.date
+      date: new Date(e.date).toDateString()
     }))
   });
 });

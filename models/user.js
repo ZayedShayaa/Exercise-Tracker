@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const exerciseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   duration: { type: Number, required: true },
-  date: String
+  date: { type: String, required: true }
 });
 
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true },
+  username: { type: String, required: true, unique: true },
   log: [exerciseSchema]
 });
 
