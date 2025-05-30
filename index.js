@@ -156,16 +156,16 @@ app.get('/api/users/:id/logs', async (req, res) => {
       }
     }
 
-    res.json({
-      _id: user._id,
-      username: user.username,
-      count: userLog.length,
-      log: userLog.map(ex => ({
-        description: ex.description,
-        duration: ex.duration,
-         date: ex.date   // التعديل هنا: التاريخ كنص
-      }))
-    });
+   res.json({
+  _id: user._id,
+  username: user.username,
+  count: userLog.length,
+  log: userLog.map(ex => ({
+    description: ex.description,
+    duration: ex.duration,
+    date: ex.date // هذا هو السطر الصحيح. لا تقم بأي تحويل هنا.
+  }))
+});
 
   } catch (err) {
     console.error('Error getting user log:', err);
