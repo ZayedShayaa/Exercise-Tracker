@@ -171,11 +171,11 @@ app.get('/api/users/:id/logs', async (req, res) => {
       _id: user._id,
       username: user.username,
       count: userLog.length,
-      log: userLog.map(ex => ({
-        description: ex.description,
-        duration: ex.duration,
-        date: ex.date // هذا هو السطر الحاسم الذي يضمن أن التاريخ بصيغة DateString
-      }))
+     log: userLog.map(ex => ({
+  description: ex.description,
+  duration: ex.duration,
+  date: ex.date // <--- فقط استخدم القيمة المخزنة مباشرة!
+}))
     });
 
   } catch (err) {
