@@ -1,136 +1,207 @@
-const express = require('express')
-const app = express()
-const bodyParser = require('body-parser')
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+// const moment = require("moment"); // لا نحتاج لـ moment إذا استخدمنا Date API
+// const shortId = require("shortid"); // FreeCodeCamp لا يتطلب shortId افتراضيًا، ولكن يمكن الإبقاء عليه إذا أردت
 
-const cors = require('cors')
+const app = express();
 
-const mongoose = require('mongoose')
-require('dotenv').config();
+/*Connect to database*/
+mongoose
+  .connect(process.env.MONGO_URI, { // استخدام MONGO_URI كما هو متوقع في .env
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB connected successfully!"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Connection error:', err));
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(express.static("public")); // لا داعي لـ path.join هنا إذا كان public في نفس المستوى
 
-app.use(cors())
-
-app.use(express.static('public'))
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/views/index.html')
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/views/index.html");
 });
 
-
-
-const listener = app.listen(process.env.PORT || 3000, () => {
-  console.log('Your app is listening on port ' + listener.address().port)
-})
-
-
+/*Model*/
+// مخطط التمرين: التاريخ سيكون من نوع Date
 let exerciseSessionSchema = new mongoose.Schema({
-  description: {type: String, required: true},
-  duration: {type: Number, required: true},
-  date: String
-})
+  description: { type: String, required: true },
+  duration: { type: Number, required: true },
+  date: { type: Date } // ✅ تغيير نوع التاريخ إلى Date
+});
 
+// مخطط المستخدم: _id يمكن أن يكون معرف MongoDB الافتراضي
 let userSchema = new mongoose.Schema({
-  username: {type: String, required: true},
+  // _id: { type: String, required: true, default: shortId.generate }, // يمكن أن يكون معرف MongoDB الافتراضي كافياً للاختبارات
+  username: { type: String, required: true, unique: true }, // اسم المستخدم يجب أن يكون فريداً
   log: [exerciseSessionSchema]
-})
+});
 
-let Session = mongoose.model('Session', exerciseSessionSchema)
-let User = mongoose.model('User', userSchema)
+let User = mongoose.model("User", userSchema); // User هو الموديل الرئيسي
 
-app.post('/api/exercise/new-user', bodyParser.urlencoded({ extended: false }), async (request, response) => {
+/*Test 1 & 2: User creation and fetching all users*/
+app.post("/api/users", async (req, res) => {
+  const username = req.body.username;
+  if (!username) {
+    return res.status(400).json({ error: "Username is required" });
+  }
   try {
-    let newUser = new User({ username: request.body.username });
-    let savedUser = await newUser.save();
-    response.json({
-      username: savedUser.username,
-      _id: savedUser.id
-    });
-  } catch (error) {
-    response.status(500).json({ error: 'Failed to save user' });
+    const foundUser = await User.findOne({ username });
+    if (foundUser) {
+      // FreeCodeCamp قد يتوقع رسالة "Username Taken" في بعض الأحيان بدلاً من 409
+      return res.send("Username Taken"); // كما كان في الكود الأول لديك
+    } else {
+      const newUser = new User({ username });
+      const savedUser = await newUser.save();
+      res.json({
+        username: savedUser.username,
+        _id: savedUser._id,
+      });
+    }
+  } catch (err) {
+    console.error("Error creating user:", err);
+    res.status(500).json({ error: "Server error creating user" });
   }
 });
 
-app.get('/api/exercise/users', (request, response) => {
-  
-  User.find({}, (error, arrayOfUsers) => {
-    if(!error){
-      response.json(arrayOfUsers)
-    }
-  })
-  
-})
-
-app.post('/api/exercise/add', bodyParser.urlencoded({ extended: false }) , (request, response) => {
-  
-  let newSession = new Session({
-    description: request.body.description,
-    duration: parseInt(request.body.duration),
-    date: request.body.date
-  })
-  
-  if(newSession.date === ''){
-    newSession.date = new Date().toISOString().substring(0, 10)
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find({}, "username _id"); // جلب فقط username و _id
+    res.json(users);
+  } catch (err) {
+    console.error("Error getting users:", err);
+    res.status(500).json({ error: "Server error getting users" });
   }
-  
-  User.findByIdAndUpdate(
-    request.body.userId,
-    {$push : {log: newSession}},
-    {new: true},
-    (error, updatedUser)=> {
-      if(!error){
-        let responseObject = {}
-        responseObject['_id'] = updatedUser.id
-        responseObject['username'] = updatedUser.username
-        responseObject['date'] = new Date(newSession.date).toDateString()
-        responseObject['description'] = newSession.description
-        responseObject['duration'] = newSession.duration
-        response.json(responseObject)
-      }
+});
+
+/*Test 3: Add Exercise Session*/
+app.post("/api/users/:_id/exercises", bodyParser.urlencoded({ extended: false }), async (req, res) => {
+  const userId = req.params._id; // _id من req.params
+  const { description, duration, date } = req.body; // البيانات من req.body
+
+  if (!description || !duration) {
+    return res.status(400).json({ error: "Description and duration are required." });
+  }
+  if (isNaN(parseInt(duration))) {
+    return res.status(400).json({ error: "Duration must be a number." });
+  }
+
+  try {
+    const userFound = await User.findById(userId);
+    if (!userFound) {
+      return res.status(404).json({ error: "User not found" });
     }
-  )
-})
 
-app.get('/api/exercise/log', (request, response) => {
-  User.findById(request.query.userId, (error, result) => {
-    if (!error && result) {
-      let responseObject = result.toJSON();
-
-      // فلترة التمارين حسب from و to إن وجدت
-      if (request.query.from || request.query.to) {
-        let fromDate = new Date(0);  // بداية الزمن
-        let toDate = new Date();     // الآن
-
-        if (request.query.from) fromDate = new Date(request.query.from);
-        if (request.query.to) toDate = new Date(request.query.to);
-
-        fromDate = fromDate.getTime();
-        toDate = toDate.getTime();
-
-        responseObject.log = responseObject.log.filter((session) => {
-          let sessionDate = new Date(session.date).getTime();
-          return sessionDate >= fromDate && sessionDate <= toDate;
-        });
+    let exerciseDate;
+    if (date) {
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
       }
-
-      // تطبيق limit
-      if (request.query.limit) {
-        responseObject.log = responseObject.log.slice(0, Number(request.query.limit));
-      }
-
-      // تحويل تاريخ كل جلسة ل toDateString()
-      responseObject.log = responseObject.log.map(session => ({
-        description: session.description,
-        duration: session.duration,
-        date: new Date(session.date).toDateString()
-      }));
-
-      responseObject.count = responseObject.log.length;
-
-      response.json(responseObject);
+      exerciseDate = parsedDate; // ✅ حفظ كتاريخ (Date object)
     } else {
-      response.status(400).json({ error: 'User not found' });
+      exerciseDate = new Date(); // ✅ حفظ كتاريخ (Date object)
     }
-  });
+
+    const newExercise = {
+      description,
+      duration: parseInt(duration),
+      date: exerciseDate, // حفظ كـ Date object
+    };
+
+    userFound.log.push(newExercise);
+    const updatedUser = await userFound.save();
+
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      description: newExercise.description,
+      duration: newExercise.duration,
+      date: new Date(newExercise.date).toDateString(), // ✅ تحويل لـ toDateString() عند الإخراج فقط
+    });
+  } catch (err) {
+    console.error("Error adding exercise:", err);
+    res.status(500).json({ error: "Server error adding exercise" });
+  }
+});
+
+
+/*Test 4, 5, 6: Get User Log with filters*/
+app.get("/api/users/:_id/logs", async (req, res) => {
+  const userId = req.params._id; // _id من req.params
+  const { from, to, limit } = req.query;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let userLog = user.log;
+
+    // تصفية حسب التاريخ "من"
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) {
+        userLog = userLog.filter(
+          (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
+        );
+      }
+    }
+
+    // تصفية حسب التاريخ "إلى"
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) {
+        // لضمان تضمين اليوم الأخير بالكامل (23:59:59.999)
+        toDate.setHours(23, 59, 59, 999);
+        userLog = userLog.filter(
+          (ex) => new Date(ex.date).getTime() <= toDate.getTime()
+        );
+      }
+    }
+
+    // تطبيق حد السجلات
+    if (limit) {
+      const limitNum = parseInt(limit);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        userLog = userLog.slice(0, limitNum);
+      }
+    }
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      count: userLog.length, // count محسوب ديناميكيًا
+      log: userLog.map((ex) => ({
+        description: ex.description,
+        duration: ex.duration,
+        date: new Date(ex.date).toDateString(), // ✅ تحويل لـ toDateString() عند الإخراج فقط
+      })),
+    });
+  } catch (err) {
+    console.error("Error getting user log:", err);
+    res.status(500).json({ error: "Server error getting user log" });
+  }
+});
+
+// 404 handler
+app.use((req, res, next) => {
+  res.status(404).send("404 Not Found");
+});
+
+// general error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
+});
+
+
+/*listener*/
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log("Your app is listening on port " + listener.address().port);
 });
