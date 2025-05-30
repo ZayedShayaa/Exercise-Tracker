@@ -19,7 +19,8 @@ mongoose
 const exerciseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   duration: { type: Number, required: true },
-  date: { type: String }, // التاريخ كسلسلة نصية (مثلاً: "Mon Jan 01 1990")
+  date: { type: Date },
+  // التاريخ كسلسلة نصية (مثلاً: "Mon Jan 01 1990")
 });
 
 const userSchema = new mongoose.Schema({
@@ -77,7 +78,9 @@ app.post("/api/users/:id/exercises", async (req, res) => {
   const { description, duration, date } = req.body;
 
   if (!description || !duration) {
-    return res.status(400).json({ error: "Description and duration are required." });
+    return res
+      .status(400)
+      .json({ error: "Description and duration are required." });
   }
 
   try {
@@ -90,7 +93,9 @@ app.post("/api/users/:id/exercises", async (req, res) => {
     if (date) {
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+        return res
+          .status(400)
+          .json({ error: "Invalid date format. Use YYYY-MM-DD." });
       }
       exerciseDate = parsedDate.toDateString();
     } else {
@@ -135,14 +140,18 @@ app.get("/api/users/:id/logs", async (req, res) => {
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
-        userLog = userLog.filter(ex => new Date(ex.date).getTime() >= fromDate.getTime());
+        userLog = userLog.filter(
+          (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
+        );
       }
     }
 
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
-        userLog = userLog.filter(ex => new Date(ex.date).getTime() <= toDate.getTime());
+        userLog = userLog.filter(
+          (ex) => new Date(ex.date).getTime() <= toDate.getTime()
+        );
       }
     }
 
@@ -157,7 +166,7 @@ app.get("/api/users/:id/logs", async (req, res) => {
       _id: user._id,
       username: user.username,
       count: userLog.length,
-      log: userLog.map(ex => ({
+      log: userLog.map((ex) => ({
         description: ex.description,
         duration: ex.duration,
         date: new Date(ex.date).toDateString(),
