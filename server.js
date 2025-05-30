@@ -148,63 +148,63 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 
 // GET /api/users/:_id/logs - Get user's exercise log with optional filters
 app.get("/api/users/:_id/logs", async (req, res) => {
-  const userId = req.params._id; // Get user ID from URL parameters
-  const { from, to, limit } = req.query; // Get filter parameters from query string
+    const userId = req.params._id;
+    const { from, to, limit } = req.query;
 
-  try {
-    // Find the user by ID
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    try {
+        // Use .lean() to get a plain JavaScript object, which can sometimes help with embedded document consistency.
+        const user = await User.findById(userId).lean(); 
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        let userLog = user.log;
+
+        // Filter by 'from' date
+        if (from) {
+            const fromDate = new Date(from);
+            if (!isNaN(fromDate.getTime())) {
+                userLog = userLog.filter(
+                    (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
+                );
+            }
+        }
+
+        // Filter by 'to' date
+        if (to) {
+            const toDate = new Date(to);
+            if (!isNaN(toDate.getTime())) {
+                toDate.setHours(23, 59, 59, 999);
+                userLog = userLog.filter(
+                    (ex) => new Date(ex.date).getTime() <= toDate.getTime()
+                );
+            }
+        }
+
+        // Apply limit to the filtered log
+        if (limit) {
+            const limitNum = parseInt(limit);
+            if (!isNaN(limitNum) && limitNum > 0) {
+                userLog = userLog.slice(0, limitNum);
+            }
+        }
+
+        res.json({
+            _id: user._id,
+            username: user.username,
+            count: userLog.length,
+            log: userLog.map((ex) => ({
+                description: ex.description,
+                duration: ex.duration,
+                // Ensure ex.date is treated as a Date object for toDateString()
+                // It's safer to ensure it's a Date object before calling toDateString()
+                date: new Date(ex.date).toDateString(), 
+            })),
+        });
+    } catch (err) {
+        console.error("Error getting user log:", err);
+        res.status(500).json({ error: "Server error getting user log" });
     }
-
-    let userLog = user.log; // Get the user's full exercise log
-
-    // Filter by 'from' date
-    if (from) {
-      const fromDate = new Date(from);
-      if (!isNaN(fromDate.getTime())) {
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
-        );
-      }
-    }
-
-    // Filter by 'to' date
-    if (to) {
-      const toDate = new Date(to);
-      if (!isNaN(toDate.getTime())) {
-        // Set time to end of the day to include all exercises on the 'to' date
-        toDate.setHours(23, 59, 59, 999);
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() <= toDate.getTime()
-        );
-      }
-    }
-
-    // Apply limit to the filtered log
-    if (limit) {
-      const limitNum = parseInt(limit);
-      if (!isNaN(limitNum) && limitNum > 0) {
-        userLog = userLog.slice(0, limitNum);
-      }
-    }
-
-    // Respond with user details, count of filtered exercises, and the filtered log
-    res.json({
-      _id: user._id,
-      username: user.username,
-      count: userLog.length, // Dynamic count based on filters
-      log: userLog.map((ex) => ({
-        description: ex.description,
-        duration: ex.duration,
-        date: new Date(ex.date).toDateString(), // Format date for response
-      })),
-    });
-  } catch (err) {
-    console.error("Error getting user log:", err);
-    res.status(500).json({ error: "Server error getting user log" });
-  }
 });
 
 /* Error Handling Middleware */
