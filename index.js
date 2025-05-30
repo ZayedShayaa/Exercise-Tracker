@@ -41,7 +41,7 @@ app.post('/api/shorturl', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html');
+  res.sendFile(__dirname + '/view/index.html');
 });
 
 app.get('/api/shorturl/:short_url', (req, res) => {
