@@ -1,62 +1,71 @@
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables from .env file
 const express = require("express");
-const cors = require("cors");
-const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
-// const moment = require("moment"); // لا نحتاج لـ moment إذا استخدمنا Date API
-// const shortId = require("shortid"); // FreeCodeCamp لا يتطلب shortId افتراضيًا، ولكن يمكن الإبقاء عليه إذا أردت
+const cors = require("cors"); // Middleware for enabling CORS
+const mongoose = require("mongoose"); // ODM for MongoDB
+const bodyParser = require("body-parser"); // Middleware to parse request bodies
 
-const app = express();
+const app = express(); // Initialize Express application
 
-/*Connect to database*/
+/* Connect to database */
+// Connect to MongoDB using the URI from environment variables
 mongoose
-  .connect(process.env.MONGO_URI, { // استخدام MONGO_URI كما هو متوقع في .env
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true, // Use new URL parser
+    useUnifiedTopology: true, // Use new server discovery and monitoring engine
   })
-  .then(() => console.log("MongoDB connected successfully!"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => console.log("MongoDB connected successfully!")) // Log success
+  .catch((err) => console.error("MongoDB connection error:", err)); // Log error
 
-app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-app.use(express.static("public")); // لا داعي لـ path.join هنا إذا كان public في نفس المستوى
+// Middleware setup
+app.use(cors()); // Enable CORS for all routes
+app.use(bodyParser.urlencoded({ extended: false })); // Parse URL-encoded bodies (for form data)
+app.use(bodyParser.json()); // Parse JSON bodies
+app.use(express.static("public")); // Serve static files from the 'public' directory
 
+// Root route to serve the index.html file
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/views/index.html");
 });
 
-/*Model*/
-// مخطط التمرين: التاريخ سيكون من نوع Date
+/* Mongoose Models */
+
+// Schema for an individual exercise session
 let exerciseSessionSchema = new mongoose.Schema({
-  description: { type: String, required: true },
-  duration: { type: Number, required: true },
-  date: { type: Date } // ✅ تغيير نوع التاريخ إلى Date
+  description: { type: String, required: true }, // Description of the exercise
+  duration: { type: Number, required: true }, // Duration of the exercise in minutes
+  date: { type: Date }, // Date of the exercise (defaults to current date if not provided)
 });
 
-// مخطط المستخدم: _id يمكن أن يكون معرف MongoDB الافتراضي
+// Schema for a user
 let userSchema = new mongoose.Schema({
-  // _id: { type: String, required: true, default: shortId.generate }, // يمكن أن يكون معرف MongoDB الافتراضي كافياً للاختبارات
-  username: { type: String, required: true, unique: true }, // اسم المستخدم يجب أن يكون فريداً
-  log: [exerciseSessionSchema]
+  username: { type: String, required: true, unique: true }, // Unique username for the user
+  log: [exerciseSessionSchema], // Array of exercise sessions for the user
 });
 
-let User = mongoose.model("User", userSchema); // User هو الموديل الرئيسي
+// Create the User model from the userSchema
+let User = mongoose.model("User", userSchema);
 
-/*Test 1 & 2: User creation and fetching all users*/
+/* API Endpoints */
+
+// POST /api/users - Create a new user
 app.post("/api/users", async (req, res) => {
-  const username = req.body.username;
+  const username = req.body.username; // Get username from request body
+
+  // Validate if username is provided
   if (!username) {
     return res.status(400).json({ error: "Username is required" });
   }
+
   try {
+    // Check if a user with the same username already exists
     const foundUser = await User.findOne({ username });
     if (foundUser) {
-      // FreeCodeCamp قد يتوقع رسالة "Username Taken" في بعض الأحيان بدلاً من 409
-      return res.send("Username Taken"); // كما كان في الكود الأول لديك
+      // If user exists, return "Username Taken" as per FreeCodeCamp test requirements
+      return res.send("Username Taken");
     } else {
+      // If username is unique, create a new user
       const newUser = new User({ username });
-      const savedUser = await newUser.save();
+      const savedUser = await newUser.save(); // Save the new user to the database
       res.json({
         username: savedUser.username,
         _id: savedUser._id,
@@ -68,9 +77,11 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
+// GET /api/users - Get a list of all users
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find({}, "username _id"); // جلب فقط username و _id
+    // Find all users and select only username and _id fields
+    const users = await User.find({}, "username _id");
     res.json(users);
   } catch (err) {
     console.error("Error getting users:", err);
@@ -78,50 +89,56 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-/*Test 3: Add Exercise Session*/
-app.post("/api/users/:_id/exercises", bodyParser.urlencoded({ extended: false }), async (req, res) => {
-  const userId = req.params._id; // _id من req.params
-  const { description, duration, date } = req.body; // البيانات من req.body
+// POST /api/users/:_id/exercises - Add an exercise session for a user
+app.post("/api/users/:_id/exercises", async (req, res) => {
+  const userId = req.params._id; // Get user ID from URL parameters
+  const { description, duration, date } = req.body; // Get exercise details from request body
 
+  // Validate required fields
   if (!description || !duration) {
     return res.status(400).json({ error: "Description and duration are required." });
   }
+  // Validate duration is a number
   if (isNaN(parseInt(duration))) {
     return res.status(400).json({ error: "Duration must be a number." });
   }
 
   try {
+    // Find the user by ID
     const userFound = await User.findById(userId);
     if (!userFound) {
       return res.status(404).json({ error: "User not found" });
     }
 
     let exerciseDate;
+    // Parse and validate the date if provided
     if (date) {
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
       }
-      exerciseDate = parsedDate; // ✅ حفظ كتاريخ (Date object)
+      exerciseDate = parsedDate; // Use the parsed date
     } else {
-      exerciseDate = new Date(); // ✅ حفظ كتاريخ (Date object)
+      exerciseDate = new Date(); // If no date, use current date
     }
 
+    // Create the new exercise object
     const newExercise = {
       description,
       duration: parseInt(duration),
-      date: exerciseDate, // حفظ كـ Date object
+      date: exerciseDate,
     };
 
-    userFound.log.push(newExercise);
-    const updatedUser = await userFound.save();
+    userFound.log.push(newExercise); // Add the new exercise to the user's log
+    const updatedUser = await userFound.save(); // Save the updated user document
 
+    // Respond with user and new exercise details
     res.json({
       _id: updatedUser._id,
       username: updatedUser.username,
       description: newExercise.description,
       duration: newExercise.duration,
-      date: new Date(newExercise.date).toDateString(), // ✅ تحويل لـ toDateString() عند الإخراج فقط
+      date: new Date(newExercise.date).toDateString(), // Format date for response
     });
   } catch (err) {
     console.error("Error adding exercise:", err);
@@ -129,21 +146,21 @@ app.post("/api/users/:_id/exercises", bodyParser.urlencoded({ extended: false })
   }
 });
 
-
-/*Test 4, 5, 6: Get User Log with filters*/
+// GET /api/users/:_id/logs - Get user's exercise log with optional filters
 app.get("/api/users/:_id/logs", async (req, res) => {
-  const userId = req.params._id; // _id من req.params
-  const { from, to, limit } = req.query;
+  const userId = req.params._id; // Get user ID from URL parameters
+  const { from, to, limit } = req.query; // Get filter parameters from query string
 
   try {
+    // Find the user by ID
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    let userLog = user.log;
+    let userLog = user.log; // Get the user's full exercise log
 
-    // تصفية حسب التاريخ "من"
+    // Filter by 'from' date
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
@@ -153,11 +170,11 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       }
     }
 
-    // تصفية حسب التاريخ "إلى"
+    // Filter by 'to' date
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
-        // لضمان تضمين اليوم الأخير بالكامل (23:59:59.999)
+        // Set time to end of the day to include all exercises on the 'to' date
         toDate.setHours(23, 59, 59, 999);
         userLog = userLog.filter(
           (ex) => new Date(ex.date).getTime() <= toDate.getTime()
@@ -165,7 +182,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       }
     }
 
-    // تطبيق حد السجلات
+    // Apply limit to the filtered log
     if (limit) {
       const limitNum = parseInt(limit);
       if (!isNaN(limitNum) && limitNum > 0) {
@@ -173,14 +190,15 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       }
     }
 
+    // Respond with user details, count of filtered exercises, and the filtered log
     res.json({
       _id: user._id,
       username: user.username,
-      count: userLog.length, // count محسوب ديناميكيًا
+      count: userLog.length, // Dynamic count based on filters
       log: userLog.map((ex) => ({
         description: ex.description,
         duration: ex.duration,
-        date: new Date(ex.date).toDateString(), // ✅ تحويل لـ toDateString() عند الإخراج فقط
+        date: new Date(ex.date).toDateString(), // Format date for response
       })),
     });
   } catch (err) {
@@ -189,19 +207,22 @@ app.get("/api/users/:_id/logs", async (req, res) => {
   }
 });
 
-// 404 handler
+/* Error Handling Middleware */
+
+// 404 Not Found handler for any unhandled routes
 app.use((req, res, next) => {
   res.status(404).send("404 Not Found");
 });
 
-// general error handler
+// General error handler for any errors that occur in the application
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something broke!");
+  console.error(err.stack); // Log the error stack for debugging
+  res.status(500).send("Something broke!"); // Send a generic error message
 });
 
+/* Listener */
 
-/*listener*/
+// Start the Express server and listen on the specified port
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Your app is listening on port " + listener.address().port);
 });
