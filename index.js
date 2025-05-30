@@ -5,7 +5,7 @@ const path = require('path');
 
 // عرض الصفحة الرئيسية من views/index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '/view/index.html'));
+  res.sendFile(path.join(__dirname, '/public/index.html'));
 });
 app.get('/api/:date?', (req, res) => {
   let dateString = req.params.date;
