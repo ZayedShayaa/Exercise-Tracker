@@ -91,59 +91,35 @@ app.get("/api/users", async (req, res) => {
 
 // POST /api/users/:_id/exercises - Add an exercise session for a user
 app.post("/api/users/:_id/exercises", async (req, res) => {
-  const userId = req.params._id; // Get user ID from URL parameters
-  const { description, duration, date } = req.body; // Get exercise details from request body
-
-  // Validate required fields
-  if (!description || !duration) {
-    return res.status(400).json({ error: "Description and duration are required." });
-  }
-  // Validate duration is a number
-  if (isNaN(parseInt(duration))) {
-    return res.status(400).json({ error: "Duration must be a number." });
-  }
-
-  try {
-    // Find the user by ID
-    const userFound = await User.findById(userId);
-    if (!userFound) {
-      return res.status(404).json({ error: "User not found" });
+  // ... (your existing code) ...
+  let exerciseDate;
+  if (date) {
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
     }
-
-    let exerciseDate;
-    // Parse and validate the date if provided
-    if (date) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
-        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
-      }
-      exerciseDate = parsedDate; // Use the parsed date
-    } else {
-      exerciseDate = new Date(); // If no date, use current date
-    }
-
-    // Create the new exercise object
-    const newExercise = {
-      description,
-      duration: parseInt(duration),
-      date: exerciseDate,
-    };
-
-    userFound.log.push(newExercise); // Add the new exercise to the user's log
-    const updatedUser = await userFound.save(); // Save the updated user document
-
-    // Respond with user and new exercise details
-    res.json({
-      _id: updatedUser._id,
-      username: updatedUser.username,
-      description: newExercise.description,
-      duration: newExercise.duration,
-      date: new Date(newExercise.date).toDateString(), // Format date for response
-    });
-  } catch (err) {
-    console.error("Error adding exercise:", err);
-    res.status(500).json({ error: "Server error adding exercise" });
+    exerciseDate = parsedDate; // Stored as Date object
+  } else {
+    exerciseDate = new Date(); // Stored as Date object
   }
+
+  const newExercise = {
+    description,
+    duration: parseInt(duration),
+    date: exerciseDate, // Saved as Date object
+  };
+
+  userFound.log.push(newExercise);
+  const updatedUser = await userFound.save();
+
+  res.json({
+    _id: updatedUser._id,
+    username: updatedUser.username,
+    description: newExercise.description,
+    duration: newExercise.duration,
+    date: new Date(newExercise.date).toDateString(), // <--- This line is also key for consistency
+  });
+  // ...
 });
 
 // GET /api/users/:_id/logs - Get user's exercise log with optional filters
