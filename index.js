@@ -1,197 +1,138 @@
-require("dotenv").config();
 const express = require("express");
+const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
-const path = require("path");
+const bodyParser = require("body-parser");
+const moment = require("moment");
+const shortId = require("shortid");
 
-const app = express();
-
-// الاتصال بقاعدة البيانات
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("MongoDB connected successfully!"))
-  .catch((err) => console.error("MongoDB connection error:", err));
-
-// مخططات Mongoose
-const exerciseSchema = new mongoose.Schema({
-  description: { type: String, required: true },
-  duration: { type: Number, required: true },
-  date: { type: Date }, // ✅ تم تغيير النوع إلى Date
+/*Connect to database*/
+mongoose.connect(process.env.URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
+if (mongoose.connection.readyState) {
+  console.log("Holy Crap! It Connected");
+} else if (!mongoose.connection.readyState) {
+  console.log("WHACHA DO!!!");
+}
+
+app.use(cors());
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+app.use(express.static("public"));
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/views/index.html");
+});
+
+/*Model*/
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  log: [exerciseSchema],
+  _id: { type: String, required: true, default: shortId.generate },
+  username: { type: String, required: true },
+  count: { type: Number, default: 0 },
+  log: [
+    {
+      description: { type: String },
+      duration: { type: Number },
+      date: { type: Date },
+    },
+  ],
 });
 
 const User = mongoose.model("User", userSchema);
 
-// Middleware
-app.use(cors());
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.urlencoded({ extended: true }));
+/*Test 1: You can POST to /api/users with form data username to create a new user.
+    The returned response will be an object with username and _id properties.*/
 
-// Routes
-
-// الصفحة الرئيسية
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "index.html"));
-});
-
-// إنشاء مستخدم جديد
-app.post("/api/users", async (req, res) => {
-  const username = req.body.username;
-  if (!username) {
-    return res.status(400).json({ error: "Username is required" });
-  }
-  try {
-    const newUser = new User({ username });
-    const savedUser = await newUser.save();
-    res.json({ username: savedUser.username, _id: savedUser._id });
-  } catch (err) {
-    if (err.code === 11000) {
-      return res.status(409).json({ error: "Username already exists" });
-    }
-    console.error("Error creating user:", err);
-    res.status(500).json({ error: "Server error creating user" });
-  }
-});
-
-// جلب جميع المستخدمين
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find({}, "username _id");
-    res.json(users);
-  } catch (err) {
-    console.error("Error getting users:", err);
-    res.status(500).json({ error: "Server error getting users" });
-  }
-});
-
-// إضافة تمرين جديد للمستخدم
-app.post("/api/users/:id/exercises", async (req, res) => {
-  const userId = req.params.id;
-  const { description, duration, date } = req.body;
-
-  if (!description || !duration) {
-    return res
-      .status(400)
-      .json({ error: "Description and duration are required." });
-  }
-
-  try {
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    let exerciseDate;
-    if (date) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
-        return res
-          .status(400)
-          .json({ error: "Invalid date format. Use YYYY-MM-DD." });
-      }
-      exerciseDate = parsedDate; // ✅ حفظ كتاريخ (Date object)
+app.post("/api/users", (req, res) => {
+  User.findOne({ username: req.body.username }, (err, foundUser) => {
+    if (err) return;
+    if (foundUser) {
+      res.send("Username Taken");
     } else {
-      exerciseDate = new Date(); // ✅ حفظ كتاريخ (Date object)
+      const newUser = new User({
+        username: req.body.username,
+      });
+      newUser.save();
+      res.json({
+        username: req.body.username,
+        _id: newUser._id,
+      });
+    }
+  });
+});
+
+/*Test 2: You can make a GET request to /api/users to get an array of all users.
+    Each element in the array is an object containing a user's username and _id.*/
+
+app.get("/api/users", (req, res) => {
+  User.find({}, (err, users) => {
+    if (err) return;
+    res.json(users);
+  });
+});
+
+/*Test 3: You can POST to /api/users/:_id/exercises with form data description, duration, and optionally date.
+    If no date is supplied, the current date will be used.
+        The response returned will be the user object with the exercise fields added.*/
+
+app.post("/api/users/:_id/exercises", (req, res) => {
+  const { _id, description, duration, date } = req.body || req.params;
+  User.findOne({ _id }, (err, userFound) => {
+    if (err)
+      return res.json({
+        error: "Counld not find Carmen Sandiego",
+      });
+
+    let exerDate = new Date();
+    if (req.body.date && req.body.date !== "") {
+      exerDate = new Date(req.body.date);
     }
 
-    const newExercise = {
-      description,
-      duration: parseInt(duration),
-      date: exerciseDate,
+    const exercise = {
+      description: description,
+      duration: duration,
+      date: exerDate,
     };
+    userFound.log.push(exercise);
+    userFound.count = userFound.log.length;
+    userFound.save((err, data) => {
+      if (err)
+        return res.json({
+          error: "Not letting you save today",
+        });
+      const lenOfLog = data.log.length;
 
-    user.log.push(newExercise);
-    const updatedUser = await user.save();
+      let displayDate = moment(exercise.date).toDate().toDateString();
 
-    res.json({
-      _id: updatedUser._id,
-      username: updatedUser.username,
-      description: newExercise.description,
-      duration: newExercise.duration,
-      date: new Date(newExercise.date).toDateString(), // ✅ هنا يتم تحويل التاريخ لـ string قبل الإرسال
+      let sendData = {
+        username: data.username,
+        description: data.log[lenOfLog - 1].description,
+        duration: data.log[lenOfLog - 1].duration,
+        _id: data._id,
+        date: displayDate,
+      };
+
+      res.send(sendData);
     });
-  } catch (err) {
-    console.error("Error adding exercise:", err);
-    res.status(500).json({ error: "Server error adding exercise" });
-  }
+  });
 });
 
-// جلب سجل التمارين مع الفلاتر
-app.get("/api/users/:id/logs", async (req, res) => {
-  const userId = req.params.id;
-  const { from, to, limit } = req.query;
+/*Test 4: You can make a GET request to /api/users/:_id/logs to retrieve a full exercise log of any user.
+    The returned response will be the user object with a log array of all the exercises added.
+        Each log item has the description, duration, and date properties.*/
 
-  try {
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+/*Test 5: A request to a user's log (/api/users/:_id/logs) returns an object with a count
+    property representing the number of exercises returned.*/
 
-    let userLog = user.log;
+/*Test 6: You can add from, to and limit parameters to a /api/users/:_id/logs request to retrieve part
+    of the log of any user. from and to are dates in yyyy-mm-dd format. limit is an integer of how many 
+      logs to send back.*/
 
-    // تصفية حسب التاريخ "من"
-    if (from) {
-      const fromDate = new Date(from);
-      if (!isNaN(fromDate.getTime())) {
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() >= fromDate.getTime()
-        );
-      }
-    }
-
-    // تصفية حسب التاريخ "إلى"
-    if (to) {
-      const toDate = new Date(to);
-      if (!isNaN(toDate.getTime())) {
-        userLog = userLog.filter(
-          (ex) => new Date(ex.date).getTime() <= toDate.getTime()
-        );
-      }
-    }
-
-    // تطبيق حد السجلات
-    if (limit) {
-      const limitNum = parseInt(limit);
-      if (!isNaN(limitNum) && limitNum > 0) {
-        userLog = userLog.slice(0, limitNum);
-      }
-    }
-
-    res.json({
-      _id: user._id,
-      username: user.username,
-      count: userLog.length,
-      log: userLog.map((ex) => ({
-        description: ex.description,
-        duration: ex.duration,
-        date: new Date(ex.date).toDateString(), // ✅ هنا يتم تحويل التاريخ لـ string قبل الإرسال
-      })),
-    });
-  } catch (err) {
-    console.error("Error getting user log:", err);
-    res.status(500).json({ error: "Server error getting user log" });
-  }
-});
-
-// 404 handler
-app.use((req, res, next) => {
-  res.status(404).send("404 Not Found");
-});
-
-// general error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something broke!");
-});
-
-// تشغيل السيرفر
+/*listener*/
 const listener = app.listen(process.env.PORT || 3000, () => {
-  console.log("Your app is listening on port " + listener.address().port);
+  console.log("Shhhhh!!!! Spying on port " + listener.address().port);
 });
