@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Exercise Tracker</title>
-    <link rel="stylesheet" href="/public/style.css" />
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -158,19 +157,20 @@
 
     <script>
       // Function to handle form submission (reusable)
-      async function submitForm(formId, endpoint, method, outputElementId, dataTransformer = null) {
+      async function submitForm(formId, endpoint, method, outputElementId) {
         const form = document.getElementById(formId);
         const output = document.getElementById(outputElementId);
-        output.textContent = 'Loading...';
+        output.textContent = 'Loading...'; // رسالة تحميل
 
         try {
           const formData = new FormData(form);
           const body = {};
+          // تحويل FormData إلى كائن عادي
           for (let [key, value] of formData.entries()) {
             body[key] = value;
           }
 
-          // Convert duration to number if present
+          // تحويل duration إلى رقم
           if (body.duration) {
             body.duration = parseInt(body.duration);
             if (isNaN(body.duration)) {
@@ -179,20 +179,26 @@
             }
           }
 
+          // بناء الطلب
           const res = await fetch(endpoint, {
             method: method,
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded' // For form data submission
+              'Content-Type': 'application/x-www-form-urlencoded' // هذا مهم لـ form data
             },
-            body: new URLSearchParams(body).toString() // Encode as URL-encoded string
+            body: new URLSearchParams(body).toString() // تحويل الكائن إلى سلسلة URL-encoded
           });
-          const data = await res.json();
+
+          const data = await res.json(); // تحليل الاستجابة كـ JSON
 
           if (res.ok) {
             output.textContent = JSON.stringify(data, null, 2);
-            // Clear form fields
-            form.reset();
-            if (dataTransformer) dataTransformer(data); // Call transformer for list updates
+            form.reset(); // مسح حقول النموذج بعد النجاح
+
+            // تحديث قائمة المستخدمين إذا كان هذا هو نموذج إنشاء المستخدم
+            if (formId === 'new-user-form') {
+              // لا نحدث القائمة مباشرة، بل نعتمد على زر "Show All Users"
+              // يمكن إضافة logic هنا لتحديثها تلقائيا إذا أردت
+            }
           } else {
             output.textContent = 'Error: ' + (data.error || res.statusText);
           }
@@ -202,13 +208,13 @@
         }
       }
 
-      // 1. Create New User
+      // 1. إنشاء مستخدم جديد
       document.getElementById('new-user-form').addEventListener('submit', (e) => {
         e.preventDefault();
         submitForm('new-user-form', '/api/users', 'POST', 'new-user-output');
       });
 
-      // 2. Add Exercise
+      // 2. إضافة تمرين
       document.getElementById('add-exercise-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const userId = document.getElementById('userId').value;
@@ -219,12 +225,12 @@
         submitForm('add-exercise-form', `/api/users/${userId}/exercises`, 'POST', 'add-exercise-output');
       });
 
-      // 3. Get All Users
+      // 3. جلب جميع المستخدمين
       document.getElementById('get-all-users-btn').addEventListener('click', async () => {
         const output = document.getElementById('all-users-output');
         const usersList = document.getElementById('users-list');
         output.textContent = 'Loading...';
-        usersList.innerHTML = ''; // Clear previous list
+        usersList.innerHTML = ''; // مسح القائمة السابقة
 
         try {
           const res = await fetch('/api/users');
@@ -248,7 +254,7 @@
         }
       });
 
-      // 4. Get User Exercise Log
+      // 4. جلب سجل تمارين المستخدم
       document.getElementById('get-log-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const logUserId = document.getElementById('logUserId').value;
@@ -261,6 +267,7 @@
         const to = document.getElementById('to').value;
         const limit = document.getElementById('limit').value;
 
+        // بناء query parameters
         let queryParams = new URLSearchParams();
         if (from) queryParams.append('from', from);
         if (to) queryParams.append('to', to);

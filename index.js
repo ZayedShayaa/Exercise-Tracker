@@ -1,9 +1,51 @@
+// 1. تحميل الوحدات والمتغيرات البيئية
+require('dotenv').config(); // لتحميل متغيرات البيئة من ملف .env
 const express = require('express');
-const router = express.Router();
-const User = require('../models/user'); // تأكد من المسار الصحيح لملف user.js
+const cors = require('cors');
+const mongoose = require('mongoose');
+const path = require('path'); // للتعامل مع مسارات الملفات
 
-// 1. POST /api/users - Create a new user
-router.post('/', async (req, res) => {
+const app = express(); // إنشاء تطبيق Express
+
+// 2. الاتصال بقاعدة البيانات MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB connected successfully!'))
+.catch(err => console.error('MongoDB connection error:', err));
+
+// 3. تعريف مخططات Mongoose (Models)
+// هذا بديل لملف models/user.js
+const exerciseSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  duration: { type: Number, required: true },
+  date: { type: String } // تاريخ التمرين كسلسلة نصية (مثال: Mon Jan 01 1990)
+});
+
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  log: [exerciseSchema] // مصفوفة من التمارين
+});
+
+const User = mongoose.model('User', userSchema); // إنشاء الموديل بناءً على المخطط
+
+// 4. Middleware (البرمجيات الوسيطة)
+app.use(cors()); // تفعيل CORS للسماح بطلبات من نطاقات مختلفة
+app.use(express.static(path.join(__dirname, 'public'))); // لخدمة الملفات الثابتة (مثل CSS إذا أضفتها)
+app.use(express.urlencoded({ extended: true })); // لتحليل بيانات النموذج (form data)
+// app.use(express.json()); // إذا كنت تخطط لإرسال JSON من الواجهة الأمامية، يمكن تفعيلها أيضًا
+
+// 5. نقاط نهاية API (Routes)
+// هذه بديل لملف routes/api.js
+
+// نقطة نهاية لعرض الصفحة الرئيسية
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
+
+// POST /api/users - إنشاء مستخدم جديد
+app.post('/api/users', async (req, res) => {
   const username = req.body.username; // استلام username من form data
 
   if (!username) {
@@ -13,10 +55,9 @@ router.post('/', async (req, res) => {
   try {
     const newUser = new User({ username });
     const savedUser = await newUser.save();
-    // العودة بنفس بنية الاستجابة المطلوبة: { username: "...", _id: "..." }
     res.json({ username: savedUser.username, _id: savedUser._id });
   } catch (err) {
-    if (err.code === 11000) { // MongoDB duplicate key error
+    if (err.code === 11000) { // MongoDB duplicate key error (اسم المستخدم موجود بالفعل)
       return res.status(409).json({ error: 'Username already exists' });
     }
     console.error('Error creating user:', err);
@@ -24,11 +65,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 2. GET /api/users - Get a list of all users
-router.get('/', async (req, res) => {
+// GET /api/users - جلب قائمة بجميع المستخدمين
+app.get('/api/users', async (req, res) => {
   try {
     const users = await User.find({}, 'username _id'); // جلب فقط username و _id
-    // العودة بمصفوفة من كائنات المستخدمين
     res.json(users);
   } catch (err) {
     console.error('Error getting users:', err);
@@ -36,8 +76,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 3. POST /api/users/:_id/exercises - Add an exercise to a user's log
-router.post('/:id/exercises', async (req, res) => {
+// POST /api/users/:_id/exercises - إضافة تمرين لسجل المستخدم
+app.post('/api/users/:id/exercises', async (req, res) => {
   const userId = req.params.id;
   const { description, duration, date } = req.body; // استلام البيانات من form data
 
@@ -60,7 +100,7 @@ router.post('/:id/exercises', async (req, res) => {
       if (isNaN(parsedDate.getTime())) { // التحقق من صلاحية التاريخ
         return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
       }
-      exerciseDate = parsedDate.toDateString();
+      exerciseDate = parsedDate.toDateString(); // تحويل التاريخ إلى DateString
     } else {
       exerciseDate = new Date().toDateString(); // التاريخ الحالي بصيغة DateString
     }
@@ -71,8 +111,8 @@ router.post('/:id/exercises', async (req, res) => {
       date: exerciseDate
     };
 
-    user.log.push(newExercise);
-    const updatedUser = await user.save();
+    user.log.push(newExercise); // إضافة التمرين إلى سجل المستخدم
+    const updatedUser = await user.save(); // حفظ التغييرات في قاعدة البيانات
 
     // العودة ببيانات المستخدم والتمرين المضاف بنفس بنية الاستجابة المطلوبة
     res.json({
@@ -80,7 +120,7 @@ router.post('/:id/exercises', async (req, res) => {
       username: updatedUser.username,
       description: newExercise.description,
       duration: newExercise.duration,
-      date: newExercise.date // التاريخ بصيغة toDateString()
+      date: newExercise.date
     });
 
   } catch (err) {
@@ -89,8 +129,8 @@ router.post('/:id/exercises', async (req, res) => {
   }
 });
 
-// 4. GET /api/users/:_id/logs - Get a user's exercise log
-router.get('/:id/logs', async (req, res) => {
+// GET /api/users/:_id/logs - جلب سجل تمارين المستخدم
+app.get('/api/users/:id/logs', async (req, res) => {
   const userId = req.params.id;
   const { from, to, limit } = req.query; // استلام parameters (من، إلى، حد)
 
@@ -102,7 +142,7 @@ router.get('/:id/logs', async (req, res) => {
 
     let userLog = user.log;
 
-    // تطبيق فلترة 'from'
+    // تطبيق فلترة 'from' (من تاريخ معين)
     if (from) {
       const fromDate = new Date(from);
       if (!isNaN(fromDate.getTime())) {
@@ -110,7 +150,7 @@ router.get('/:id/logs', async (req, res) => {
       }
     }
 
-    // تطبيق فلترة 'to'
+    // تطبيق فلترة 'to' (إلى تاريخ معين)
     if (to) {
       const toDate = new Date(to);
       if (!isNaN(toDate.getTime())) {
@@ -118,10 +158,10 @@ router.get('/:id/logs', async (req, res) => {
       }
     }
 
-    // تطبيق 'limit'
+    // تطبيق 'limit' (الحد الأقصى لعدد السجلات)
     if (limit) {
       const limitNum = parseInt(limit);
-      if (!isNaN(limitNum) && limitNum > 0) {
+      if (!isNaN(limitNum) && limitNum > 0) { // تأكد من أن Limit رقم موجب
         userLog = userLog.slice(0, limitNum);
       }
     }
@@ -144,4 +184,18 @@ router.get('/:id/logs', async (req, res) => {
   }
 });
 
-module.exports = router;
+// 6. معالجة الأخطاء 404
+app.use((req, res, next) => {
+  res.status(404).send('404 Not Found');
+});
+
+// 7. معالج الأخطاء العام
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
+
+// 8. بدء تشغيل الخادم
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port);
+});
