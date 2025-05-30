@@ -11,7 +11,7 @@ app.use(cors());
 app.use('/public', express.static(`${process.cwd()}/public`));
 
 app.get('/', function(req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
+  res.sendFile(process.cwd() + '/view/index.html');
 });
 
 // Your first API endpoint
