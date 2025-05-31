@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exercise Tracker</title>
+  <link rel="shortcut icon" href="https://cdn.freecodecamp.org/universal/favicons/favicon-32x32.png" type="image/x-icon" />
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet" type="text/css">
+  <link href="style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+  <div class="container">
+    <h1>Exercise Tracker</h1>
+    <form action="/api/users" method="post">
+      <h3>Create a New User</h3>
+      <p><code>POST /api/users</code></p>
+      <input id="uname" type="text" name="username" placeholder="username" />
+      <input type="submit" value="Submit" />
+    </form>
+     <form id="exercise-form" method="post"><h3>Add Exercise Session</h3>
+      <p><code>POST /api/users/:_id/exercises</code></p>
+      
+  <input id="uid" type="text" name="_id" placeholder="User ID*" required /><br>
+  <input id="desc" type="text" name="description" placeholder="description*" required /><br>
+  <input id="dur" type="text" name="duration" placeholder="duration* (mins.)" required /><br>
+  <input id="date" type="text" name="date" placeholder="date (yyyy-mm-dd)" /><br>
+  <input type="submit" value="Add Session" />
+</form>
+
+<script>
+ document.getElementById('exercise-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const userId = document.getElementById('uid').value.trim();
+  const description = document.getElementById('desc').value.trim();
+  const duration = document.getElementById('dur').value.trim();
+  const date = document.getElementById('date').value.trim();
+
+  if (!userId || !description || !duration) return;
+
+  const url = `/api/users/${userId}/exercises`;
+  const formData = new URLSearchParams();
+  formData.append('description', description);
+  formData.append('duration', duration);
+  if (date) formData.append('date', date);
+
+  try {
+    // إرسال البيانات إلى الخادم
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
+    });
+
+    const exerciseData = await response.json();
+
+    // **إعادة التوجيه إلى صفحة عرض البيانات بصيغة JSON**
+    window.location.href = `/api/users/${userId}/exercises`;
+
+  } catch (error) {
+    console.error('Error submitting exercise:', error);
+    alert('حدث خطأ أثناء إرسال التمرين. تأكد من صحة البيانات.');
+  }
+});
+
+</script>
+
+</body>
+</html>
