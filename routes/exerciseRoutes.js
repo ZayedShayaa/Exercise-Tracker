@@ -38,11 +38,11 @@ router.post("/:_id/exercises", async (req, res) => {
     await newExercise.save();
 
     res.json({
-      _id: user._id,
       username: user.username,
-      date: newExercise.date.toDateString(), // Use toDateString for expected format
-      duration: newExercise.duration,
       description: newExercise.description,
+      duration: newExercise.duration,
+      date: newExercise.date.toDateString(),
+      _id: user._id,
     });
   } catch (err) {
     console.error(err);
@@ -100,9 +100,9 @@ router.get("/:_id/logs", async (req, res) => {
     }));
 
     res.json({
-      _id: user._id,
       username: user.username,
       count: formattedLog.length,
+      _id: user._id,
       log: formattedLog,
     });
   } catch (err) {
