@@ -1,5 +1,50 @@
 <!DOCTYPE html>
 <html>
+
+<head>
+  <title>Exercise Tracker</title>
+  <link rel="shortcut icon" href="https://cdn.freecodecamp.org/universal/favicons/favicon-32x32.png"
+    type="image/x-icon" />
+  <link href="/style.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+  <div class="container">
+    <h1>Exercise Tracker</h1>
+    <form action="/api/users" method="post" id="new-user-form">
+      <h3>Create a New User</h3>
+      <input id="uname" type="text" name="username" placeholder="username" />
+      <input type="submit" value="Submit" />
+    </form>
+    <form action="/api/users/:_id/exercises" method="post" id="exercise-form">
+      <h3>Add an Exercise</h3>
+      <input id="uid" type="text" name=":_id" placeholder="User ID*" />
+      <input id="desc" type="text" name="description" placeholder="Description*" />
+      <input id="dur" type="text" name="duration" placeholder="Duration (mins)*" />
+      <input id="date" type="text" name="date" placeholder="Date (yyyy-mm-dd)" />
+      <input type="submit" value="Submit" />
+    </form>
+    <form action="/api/users/:_id/logs" method="get" id="log-form">
+      <h3>Get Exercise Log</h3>
+      <input id="log-uid" type="text" name="_id" placeholder="User ID*" />
+      <input id="from" type="text" name="from" placeholder="From (yyyy-mm-dd)" />
+      <input id="to" type="text" name="to" placeholder="To (yyyy-mm-dd)" />
+      <input id="limit" type="text" name="limit" placeholder="Limit" />
+      <input type="submit" value="Submit" />
+    </form>
+    <p>
+      <strong>Note:</strong> For "User ID*" fields, use the `_id` returned when creating a user.
+    </p>
+    <div id="output"></div>
+  </div>
+  <script src="/script.js"></script>
+</body>
+
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html>
 <head>
   <title>Exercise Tracker</title>
   <link rel="shortcut icon" href="https://cdn.freecodecamp.org/universal/favicons/favicon-32x32.png" type="image/x-icon" />
@@ -64,4 +109,4 @@
 </script>
 
 </body>
-</html>
+</html> -->

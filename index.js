@@ -138,7 +138,8 @@ app.get("/api/users/:_id/logs", async (req, res) => {
     let userLog = user.log.map(ex => ({
       description: ex.description,
       duration: ex.duration,
-      date: new Date(ex.date).toDateString(),
+      date: new Date(ex.date).toDateString()
+      
     }));
 
     if (from) {
@@ -148,7 +149,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
 
     if (to) {
       const toDate = new Date(to);
-      userLog = userLog.filter(ex => new Date(ex.date) <= toDate);
+      userLog = userLog.filter(ex => new Date(ex.date).getTime() <= toDate.getTime());
     }
 
     if (limit && !isNaN(parseInt(limit))) {
