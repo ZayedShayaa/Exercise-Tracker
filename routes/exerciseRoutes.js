@@ -52,7 +52,6 @@ router.post("/:_id/exercises", async (req, res) => {
 
 // GET /api/users/:_id/logs - Get user's exercise log
 router.get("/:_id/logs", async (req, res) => {
-  // المسار هنا هو '/:_id/logs' نسبة للروتر
   const { _id } = req.params;
   const { from, to, limit } = req.query;
 
@@ -64,16 +63,18 @@ router.get("/:_id/logs", async (req, res) => {
 
     let dateFilter = {};
     if (from) {
-      dateFilter.$gte = new Date(from + "T00:00:00.000Z");
-      if (isNaN(dateFilter.$gte.getTime())) {
+      const fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) {
         return res.status(400).json({ error: "Invalid 'from' date format" });
       }
+      dateFilter.$gte = fromDate;
     }
     if (to) {
-      dateFilter.$lte = new Date(to + "T23:59:59.999Z");
-      if (isNaN(dateFilter.$lte.getTime())) {
+      const toDate = new Date(to);
+      if (isNaN(toDate.getTime())) {
         return res.status(400).json({ error: "Invalid 'to' date format" });
       }
+      dateFilter.$lte = toDate;
     }
 
     let query = { userId: _id };
@@ -81,17 +82,15 @@ router.get("/:_id/logs", async (req, res) => {
       query.date = dateFilter;
     }
 
-    let exercises = Exercise.find(query);
-
+    let exercisesQuery = Exercise.find(query).sort({ date: 1 }); // ترتيب زمني لتسهيل الفهم
     if (limit) {
       const parsedLimit = parseInt(limit);
-      if (isNaN(parsedLimit) || parsedLimit <= 0) {
-        return res.status(400).json({ error: "Invalid 'limit' value" });
+      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+        exercisesQuery = exercisesQuery.limit(parsedLimit);
       }
-      exercises = exercises.limit(parsedLimit);
     }
 
-    const log = await exercises.exec();
+    const log = await exercisesQuery.exec();
 
     const formattedLog = log.map((ex) => ({
       description: ex.description,
