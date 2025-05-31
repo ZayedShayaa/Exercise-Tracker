@@ -21,14 +21,14 @@
       <input id="uid" type="text" name=":_id" placeholder="User ID*" />
       <input id="desc" type="text" name="description" placeholder="Description*" />
       <input id="dur" type="text" name="duration" placeholder="Duration (mins)*" />
-      <input id="date" type="text" name="date" placeholder="Date (yyyy-mm-dd)" />
+      <input id="date" type="date" name="date" placeholder="Date (yyyy-mm-dd)" />
       <input type="submit" value="Submit" />
     </form>
     <form action="/api/users/:_id/logs" method="get" id="log-form">
       <h3>Get Exercise Log</h3>
       <input id="log-uid" type="text" name="_id" placeholder="User ID*" />
-      <input id="from" type="text" name="from" placeholder="From (yyyy-mm-dd)" />
-      <input id="to" type="text" name="to" placeholder="To (yyyy-mm-dd)" />
+      <input id="from" type="date" name="from" placeholder="From (yyyy-mm-dd)" />
+      <input id="to" type="date" name="to" placeholder="To (yyyy-mm-dd)" />
       <input id="limit" type="text" name="limit" placeholder="Limit" />
       <input type="submit" value="Submit" />
     </form>

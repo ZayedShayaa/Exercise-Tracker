@@ -64,13 +64,13 @@ router.get("/:_id/logs", async (req, res) => {
 
     let dateFilter = {};
     if (from) {
-      dateFilter.$gte = new Date(from);
+      dateFilter.$gte = new Date(from + "T00:00:00.000Z");
       if (isNaN(dateFilter.$gte.getTime())) {
         return res.status(400).json({ error: "Invalid 'from' date format" });
       }
     }
     if (to) {
-      dateFilter.$lte = new Date(to);
+      dateFilter.$lte = new Date(to + "T23:59:59.999Z");
       if (isNaN(dateFilter.$lte.getTime())) {
         return res.status(400).json({ error: "Invalid 'to' date format" });
       }
