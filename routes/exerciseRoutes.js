@@ -74,6 +74,7 @@ router.get("/:_id/logs", async (req, res) => {
       if (isNaN(toDate.getTime())) {
         return res.status(400).json({ error: "Invalid 'to' date format" });
       }
+      toDate.setUTCHours(23, 59, 59, 999);
       dateFilter.$lte = toDate;
     }
 
